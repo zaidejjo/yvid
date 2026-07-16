@@ -3,6 +3,10 @@ name = "yvid"
 version = "1.0.0"
 description = "Modern Video Downloader — Desktop GUI + Terminal CLI"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Zaid Ajo", email = "zaidejjodev@gmail.com"},
+]
 dependencies = [
     "customtkinter>=5.2.2",
     "yt-dlp>=2025.0.0",
@@ -12,15 +16,84 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/user/yvid"
+homepage = "https://github.com/zaidejjo/yvid"
+repository = "https://github.com/zaidejjo/yvid"
+bugs = "https://github.com/zaidejjo/yvid/issues"
 
 [project.scripts]
 yvid = "cli:main"
 yvid-cli = "cli:main"
+yvid-gui = "app:main"
 
 [build-system]
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ["cli", "app"]
+py-modules = ["app", "cli"]
+
+[tool.setuptools.packages.find]
+include = ["core"]
+
+# ═══════════════════════════════════════════════════════════
+#  BeeWare Briefcase  —  cross-platform native packaging
+# ═══════════════════════════════════════════════════════════
+#
+# Build commands:
+#   briefcase create     # scaffold the bundle
+#   briefcase build      # compile / prepare
+#   briefcase package    # produce .app / .msi / .deb / AppImage
+#
+# Targets:
+#   briefcase package macOS    →  YVid.app
+#   briefcase package windows  →  YVid.msi
+#   briefcase package linux    →  YVid.deb  (system_deb)
+#   briefcase package linux:appimage → YVid.AppImage
+# ───────────────────────────────────────────────────────────
+
+[tool.briefcase]
+project_name = "YVid"
+bundle = "com.zaidejjo"
+version = "1.0.0"
+url = "https://github.com/zaidejjo/yvid"
+license = "MIT"
+author = "Zaid Ajo"
+author_email = "zaidejjodev@gmail.com"
+
+[tool.briefcase.app.yvid]
+formal_name = "YVid"
+description = "Modern Video Downloader — Desktop GUI + Terminal CLI"
+long_description = """
+A modern, user-friendly video downloader built with CustomTkinter and yt-dlp.
+Supports downloading videos and audio from YouTube and hundreds of other sites.
+Features include format selection, subtitle downloading, and video trimming.
+Available as both a desktop GUI application and a feature-rich terminal CLI.
+"""
+icon = "assets/logo"
+sources = ["app.py", "cli.py", "core", "__main__.py"]
+requires = [
+    "customtkinter>=5.2.2",
+    "yt-dlp>=2025.0.0",
+    "Pillow>=9.0.0",
+    "rich>=13.0.0",
+    "questionary>=2.0.0",
+]
+console_app = false
+
+[tool.briefcase.app.yvid.linux]
+system_requires = ["ffmpeg"]
+
+[tool.briefcase.app.yvid.linux.system_deb]
+system_requires = ["ffmpeg"]
+
+[tool.briefcase.app.yvid.linux.system_rpm]
+system_requires = ["ffmpeg"]
+
+[tool.briefcase.app.yvid.linux.appimage]
+system_requires = ["ffmpeg"]
+
+[tool.briefcase.app.yvid.macOS]
+icon = "assets/icon"
+
+[tool.briefcase.app.yvid.windows]
+icon = "assets/favicon"
