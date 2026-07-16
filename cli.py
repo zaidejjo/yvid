@@ -3,6 +3,8 @@
 YVid-CLI — Modern Terminal Video Downloader
 
 Built with yt-dlp + Rich + Questionary.
+Shared core logic lives under ``core/``.
+
 Usage:
     yvid                   Interactive TUI
     yvid --url <URL>       Hybrid — prompts for missing options
@@ -14,14 +16,12 @@ from __future__ import annotations
 import argparse
 import os
 import queue
-import re
 import shutil
 import subprocess
 import sys
-import threading
 
-import yt_dlp
 import questionary
+import yt_dlp
 from questionary import Style as QStyle
 from rich import box
 from rich.align import Align
@@ -38,235 +38,20 @@ from rich.progress import (
 from rich.table import Table
 from rich.text import Text
 
-
-# ═══════════════════════════════════════════════════════════════
-#  CONSTANTS
-# ═══════════════════════════════════════════════════════════════
-
-APP_NAME = "YVid-CLI"
-VERSION = "1.0.0"
-DEFAULT_OUTPUT_DIR = os.path.expanduser("~/Videos/YVid")
-
-FORMAT_VIDEO_QUALITY = {
-    "Best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-    "2160p": (
-        "bestvideo[ext=mp4][height<=2160]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=2160]/best"
-    ),
-    "1080p": (
-        "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=1080]/best"
-    ),
-    "720p": (
-        "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=720]/best"
-    ),
-    "480p": (
-        "bestvideo[ext=mp4][height<=480]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=480]/best"
-    ),
-    "360p": (
-        "bestvideo[ext=mp4][height<=360]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=360]/best"
-    ),
-}
-
-ERROR_PATTERNS: list[tuple[str, str]] = [
-    (r"HTTP Error 403", "Access denied. The video may be private or age-restricted."),
-    (r"HTTP Error 429", "Request rate limited. Wait a moment and retry."),
-    (r"HTTP Error 4\d\d", "Video not available (server returned {code})."),
-    (r"HTTP Error 5\d\d", "Server error. The platform may be experiencing issues."),
-    (r"Video unavailable", "This video has been removed or is unavailable."),
-    (r"Private video", "This video is private. Sign-in is required."),
-    (
-        r"ffmpeg not found|ffprobe not found",
-        "FFmpeg is required. Install FFmpeg and try again.",
-    ),
-    (
-        r"Connection refused|ConnectionError|Cannot connect",
-        "Network error. Check your internet connection.",
-    ),
-    (r"SSL", "SSL connection error. Check your network or date settings."),
-    (r"No video formats found", "No available formats found for this video."),
-    (r"unsupported url", "Unsupported URL. Please enter a valid video URL."),
-]
-
-
-# ═══════════════════════════════════════════════════════════════
-#  HELPERS
-# ═══════════════════════════════════════════════════════════════
-
-
-def format_bytes(n: float) -> str:
-    if not n:
-        return "0 B"
-    units = ["B", "KB", "MB", "GB", "TB"]
-    i = 0
-    n = float(n)
-    while n >= 1024 and i < len(units) - 1:
-        n /= 1024
-        i += 1
-    return f"{n:.1f} {units[i]}"
-
-
-def format_eta(seconds: float) -> str:
-    if not seconds or seconds < 0:
-        return "\u2014\u2014"
-    s = int(seconds)
-    if s < 60:
-        return f"0:{s:02d}"
-    if s < 3600:
-        return f"{s // 60}:{s % 60:02d}"
-    return f"{s // 3600}:{(s % 3600) // 60:02d}:{s % 60:02d}"
-
-
-def is_valid_url(url: str) -> bool:
-    url = url.strip()
-    if not url:
-        return False
-    return bool(re.match(r"^https?://[^\s/$.?#].[^\s]*$", url))
-
-
-def format_error_message(error_str: str) -> str:
-    for pattern, message in ERROR_PATTERNS:
-        match = re.search(pattern, error_str, re.IGNORECASE)
-        if match:
-            code = match.group(0) if match.lastgroup is None else ""
-            return message.format(code=code)
-    msg = error_str.strip()[:120]
-    if len(error_str) > 120:
-        msg += "\u2026"
-    return f"Download failed: {msg}"
-
-
-def parse_time(value: str) -> int | None:
-    """Convert *HH:MM:SS* / *MM:SS* / *SS* to total seconds.
-
-    Returns ``None`` when the value is empty or the format is invalid.
-    """
-    s = value.strip()
-    if not s:
-        return None
-    parts = s.split(":")
-    if len(parts) > 3:
-        return None
-    try:
-        parts_int = [int(p) for p in parts]
-    except ValueError:
-        return None
-    if any(p < 0 for p in parts_int):
-        return None
-    if len(parts_int) == 1:
-        return parts_int[0]
-    if len(parts_int) == 2:
-        return parts_int[0] * 60 + parts_int[1]
-    return parts_int[0] * 3600 + parts_int[1] * 60 + parts_int[2]
-
-
-# ═══════════════════════════════════════════════════════════════
-#  DOWNLOAD WORKER  (background thread)
-# ═══════════════════════════════════════════════════════════════
-
-
-class DownloadThread(threading.Thread):
-    """Runs yt-dlp in a daemon thread and pushes progress updates to a queue."""
-
-    def __init__(self, url: str, ydl_opts: dict, progress_queue: queue.Queue) -> None:
-        super().__init__(daemon=True)
-        self.url = url
-        self.ydl_opts = ydl_opts
-        self.queue = progress_queue
-        self._original_filename: str | None = None
-
-    def run(self) -> None:
-        try:
-            self.ydl_opts["progress_hooks"] = [self._progress_hook]
-            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-                ydl.download([self.url])
-
-            output_path = self._resolve_output_path()
-            self.queue.put({"status": "completed", "output_path": output_path})
-
-        except Exception as exc:
-            self.queue.put(
-                {"status": "error", "message": format_error_message(str(exc))}
-            )
-
-    def _progress_hook(self, d: dict) -> None:
-        if d["status"] == "downloading":
-            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-            downloaded = d.get("downloaded_bytes", 0)
-            speed = d.get("speed") or 0
-            eta = d.get("eta") or 0
-            percent = (downloaded / total * 100) if total > 0 else 0.0
-
-            self.queue.put(
-                {
-                    "status": "downloading",
-                    "percent": percent,
-                    "speed": speed,
-                    "eta": eta,
-                    "downloaded": downloaded,
-                    "total": total,
-                }
-            )
-
-        elif d["status"] == "finished":
-            self._original_filename = d.get("filename", "")
-            self.queue.put({"status": "post_processing"})
-
-    def _resolve_output_path(self) -> str:
-        if not self._original_filename:
-            return ""
-
-        is_audio = any(
-            pp.get("key") == "FFmpegExtractAudio"
-            for pp in self.ydl_opts.get("postprocessors", [])
-        )
-
-        if is_audio:
-            path = os.path.splitext(self._original_filename)[0] + ".mp3"
-        else:
-            path = self._original_filename
-
-        if os.path.exists(path):
-            return path
-
-        # Fallback: scan the output directory for the newest media file.
-        outdir = os.path.dirname(self.ydl_opts.get("outtmpl", ""))
-        if outdir and os.path.isdir(outdir):
-            VALID_EXTS = frozenset(
-                {
-                    ".mp4",
-                    ".mkv",
-                    ".webm",
-                    ".mp3",
-                    ".m4a",
-                    ".ogg",
-                    ".opus",
-                    ".flac",
-                    ".wav",
-                    ".aac",
-                }
-            )
-            try:
-                candidates = [
-                    os.path.join(outdir, f)
-                    for f in os.listdir(outdir)
-                    if (
-                        os.path.splitext(f)[1].lower() in VALID_EXTS
-                        and not f.endswith(".part")
-                        and not f.endswith(".temp")
-                    )
-                ]
-                if candidates:
-                    best = max(candidates, key=os.path.getmtime)
-                    if os.path.getsize(best) > 0:
-                        return best
-            except OSError:
-                pass
-
-        return path if os.path.exists(path) else ""
+from core.config import (
+    APP_NAME,
+    VERSION,
+    DEFAULT_OUTPUT_DIR,
+    FORMAT_VIDEO_QUALITY,
+)
+from core.helpers import (
+    format_bytes,
+    format_eta,
+    format_error_message,
+    is_valid_url,
+    parse_time,
+)
+from core.download_thread import DownloadThread
 
 
 # ═══════════════════════════════════════════════════════════════
