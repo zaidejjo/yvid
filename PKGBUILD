@@ -58,7 +58,7 @@ depends=(
 # `python-uv` brings in `uv` and `python-installer` transitively
 # when needed; we list installer explicitly for clarity.
 makedepends=(
-    'python-uv'
+    'uv'
     'python-installer'
 )
 
