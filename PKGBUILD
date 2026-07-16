@@ -53,15 +53,12 @@ depends=(
     'python-rich'
     'python-packaging'
     'python-wcwidth'
+    'tk'
 )
-
-# `python-uv` brings in `uv` and `python-installer` transitively
-# when needed; we list installer explicitly for clarity.
 makedepends=(
     'uv'
     'python-installer'
 )
-
 optdepends=(
     'xdg-utils: opening downloaded files from the CLI'
 )
