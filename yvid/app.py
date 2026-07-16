@@ -28,20 +28,20 @@ import customtkinter as ctk
 import yt_dlp
 from PIL import Image, ImageDraw, ImageTk
 
-from core.config import (
+from .core.config import (
     APP_NAME,
     VERSION,
     DEFAULT_OUTPUT_DIR,
     FORMAT_VIDEO_QUALITY,
 )
-from core.helpers import (
+from .core.helpers import (
     format_bytes,
     format_eta,
     format_error_message,
     is_valid_url,
     parse_time,
 )
-from core.download_thread import DownloadThread
+from .core.download_thread import DownloadThread
 
 # ═══════════════════════════════════════════════════════════
 #  CONSTANTS  (GUI-specific only — shared values in core.config)

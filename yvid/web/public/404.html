@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <title>404 — Page not found · YVid</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; color-scheme: dark; }
+    body {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #070B14;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      color: #fff;
+      overflow: hidden;
+      position: relative;
+    }
+    /* Ambient glow */
+    .glow {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(80px);
+      opacity: 0.12;
+    }
+    .glow-1 { width: 500px; height: 500px; top: -150px; left: -100px; background: radial-gradient(circle, rgba(59,130,246,0.5), transparent); }
+    .glow-2 { width: 400px; height: 400px; bottom: -100px; right: -80px; background: radial-gradient(circle, rgba(6,182,212,0.4), transparent); animation-delay: 2s; }
+    .glow-3 { width: 300px; height: 300px; top: 50%; left: 50%; transform: translate(-50%, -50%); background: radial-gradient(circle, rgba(59,130,246,0.15), transparent); }
+    /* Grid overlay */
+    .grid-overlay {
+      position: absolute; inset: 0; pointer-events: none; opacity: 0.015;
+      background-image: linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+    .content { position: relative; z-index: 10; text-align: center; padding: 2rem; }
+    .logo { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 2.5rem; text-decoration: none; }
+    .logo img { width: 36px; height: 36px; border-radius: 8px; }
+    .logo span { font-size: 1.25rem; font-weight: 600; color: #fff; letter-spacing: -0.02em; }
+    .code { font-size: 7rem; font-weight: 800; line-height: 1; margin-bottom: 0.5rem;
+             background: linear-gradient(135deg, #60A5FA, #22D3EE, #3B82F6);
+             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+             background-clip: text; }
+    .code-glow { text-shadow: 0 0 60px rgba(59,130,246,0.25); }
+    h1 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.75rem; }
+    p { font-size: 1rem; color: rgba(255,255,255,0.5); max-width: 400px; margin: 0 auto 2rem; line-height: 1.6; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 32px; border-radius: 16px; font-size: 0.9375rem; font-weight: 600;
+      text-decoration: none; color: #fff;
+      background: linear-gradient(135deg, #3B82F6, #06B6D4);
+      box-shadow: 0 0 30px -5px rgba(59,130,246,0.25);
+      transition: all 0.3s ease;
+    }
+    .btn:hover { transform: scale(1.03); box-shadow: 0 0 40px -5px rgba(59,130,246,0.4); }
+    .btn:active { transform: scale(0.97); }
+    .footer { position: absolute; bottom: 2rem; z-index: 10; font-size: 0.75rem; color: rgba(255,255,255,0.25); }
+    @media (max-width: 640px) {
+      .code { font-size: 5rem; }
+      h1 { font-size: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+  <div class="glow glow-3"></div>
+  <div class="grid-overlay"></div>
+
+  <div class="content">
+    <a href="/" class="logo">
+      <img src="/logo-48x48.webp" alt="YVid" width="36" height="36" />
+      <span>YVid</span>
+    </a>
+    <div class="code code-glow">404</div>
+    <h1>Page not found</h1>
+    <p>This page doesn't exist or has been moved. Let's get you back on track.</p>
+    <a href="/" class="btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Back to Home
+    </a>
+  </div>
+
+  <div class="footer">YVid &middot; MIT License</div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# YVid — robots.txt
+# https://yvid.pages.dev
+
+User-agent: *
+Allow: /
+Allow: /install.sh
+
+Disallow: /_astro/
+
+# Sitemap
+Sitemap: https://yvid.pages.dev/sitemap.xml

@@ -1,0 +1,62 @@
+# YVid — LLMs.txt
+> https://yvid.pages.dev
+
+YVid is an open-source video and audio downloader with a sleek GUI and a powerful CLI. It downloads videos, audio, and playlists from multiple platforms with blazing speed and a clean modular codebase.
+
+## Key Info
+
+- **Project:** YVid
+- **Version:** v2.0.0
+- **License:** MIT
+- **Repository:** https://github.com/zaidejjo/yvid
+- **Install:** https://yvid.pages.dev/#install
+- **Website:** https://yvid.pages.dev
+
+## Quick Install
+
+### One-command install (auto-detect OS):
+```sh
+curl -fsSL https://yvid.pages.dev/install.sh | sh
+```
+
+### Package managers:
+```
+# Arch Linux (AUR)
+yay -S yvid-git
+
+# UV (Python)
+uv tool install yvid
+
+# PIP (Standard)
+pip install yvid
+```
+
+## Architecture
+
+- **core/**: Download logic, format negotiation, playlist parsing
+- **cli/**: Rich terminal interface (click + rich)
+- **GUI/**: Desktop interface (Dear PyGui)
+- **thread/**: Concurrent download engine with queue management
+
+## Platforms
+
+- macOS (Intel & Apple Silicon)
+- Linux (deb/rpm/arch)
+- Windows (exe/msi)
+
+## Key Features
+
+- Low memory footprint (~42 MB for 4K downloads)
+- Stream-based downloading (no full-file RAM loading)
+- Pause/resume/cancel individual downloads
+- Concurrent download queue
+- System tray integration (GUI)
+- 98% test coverage
+- 12 core modules
+
+## Tech Stack
+
+- GUI: Dear PyGui
+- CLI: rich + click
+- Runtime: Python 3.10+
+- Landing page: Astro + Tailwind CSS

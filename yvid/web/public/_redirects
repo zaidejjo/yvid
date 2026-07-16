@@ -1,0 +1,17 @@
+# YVid — Cloudflare Pages Redirects
+# https://yvid.pages.dev
+
+# Enforce HTTPS
+http://yvid.pages.dev/*  https://yvid.pages.dev/:splat  301
+
+# Short URL for install
+/install  /#install  301
+
+# Short URL for GitHub
+/github  https://github.com/zaidejjo/yvid  302
+
+# Short URL for source
+/source  https://github.com/zaidejjo/yvid  302
+
+# Short URL for docs (placeholder)
+/docs  /#architecture  301
