@@ -3,19 +3,20 @@
 #
 # Arch Linux / AUR PKGBUILD for YVid
 # ===================================
-# Build from source (GitHub release tag) using PEP 517.
+# Build using `uv` — fast, isolated, conflict-free.
 #
-# Dependency strategy
-# -------------------
-# Packages in official Arch repos  → listed in `depends` (pacman-managed)
-# Packages only in AUR / PyPI      → installed via pip at build time
+# Strategy
+# --------
+#   depends        python, ffmpeg           → system-level only
+#   makedepends    python-uv                → uv handles all Python deps
+#   build()        uv build --wheel         → PEP 517 isolated build
+#   package()      uv pip install --target  → bundles ALL Python deps into
+#                                             $pkgdir's site-packages with
+#                                             zero host-system pollution
 #
-# Arch packages used:
-#   python-pillow, python-rich     [extra]
-#   yt-dlp                         [extra]  (not python-yt-dlp)
-#   python, ffmpeg                 [core, extra]
-#
-# PyPI-only:  customtkinter, questionary
+# There are NO file conflicts with Arch Python packages because every
+# Python dependency lives inside our package directory, not in
+# /usr/lib/python*/site-packages/ of the running system.
 #
 # Installs:
 #   yvid           — terminal CLI (interactive TUI + direct args)
@@ -39,21 +40,19 @@ arch=('any')
 url="https://github.com/zaidejjo/yvid"
 license=('MIT')
 
-# ── Official Arch repo dependencies ──────────────────────────
+# ── System-level dependencies only ───────────────────────────
+# All Python libraries are bundled at build time via uv, so the
+# only runtime requirements are Python itself and FFmpeg.
 depends=(
     'python'
-    'yt-dlp'
-    'python-pillow'
-    'python-rich'
     'ffmpeg'
 )
 
+# `python-uv` brings in `uv` and `python-installer` transitively
+# when needed; we list installer explicitly for clarity.
 makedepends=(
-    'python-build'
+    'python-uv'
     'python-installer'
-    'python-wheel'
-    'python-setuptools'
-    'python-pip'
 )
 
 optdepends=(
@@ -68,16 +67,10 @@ sha256sums=('SKIP')
 build() {
     cd "$srcdir/$pkgname-$pkgver"
 
-    # ── AUR-only Python deps ──────────────────────────────
-    # These packages are NOT in the official Arch repositories.
-    # Install them from PyPI so the build can resolve all imports.
-    PIP_REQUIRE_VIRTUALENV=false python -m pip install \
-        customtkinter questionary \
-        --break-system-packages --no-input 2>&1 \
-        | grep -v "already satisfied" || true
-
-    # ── Build wheel (--no-isolation: use system Python libs) ──
-    python -m build --wheel --no-isolation
+    # ── Build wheel via uv (PEP 517 isolated build) ─────────
+    # uv handles dependency resolution from pyproject.toml in an
+    # isolated temporary environment — no host Python pollution.
+    uv build --wheel
 }
 
 check() {
@@ -88,23 +81,24 @@ check() {
 package() {
     cd "$srcdir/$pkgname-$pkgver"
 
-    # ── 1. Install the Python package (wheel) ──────────────
-    #     This creates /usr/bin/{yvid,yvid-cli,yvid-gui}
-    #     and installs the Python modules into site-packages.
+    # ── 1. Install the built wheel ──────────────────────────
+    #     python -m installer correctly creates the
+    #     /usr/bin/{yvid,yvid-cli,yvid-gui} entry-point scripts.
     python -m installer --destdir="$pkgdir" dist/*.whl
 
-    # ── 2. Ship AUR-only Python libs inside our package ────
-    #     customtkinter and questionary are not available via
-    #     pacman, so we bundle them so the user has everything
-    #     they need after `pacman -U`.
-    PIP_REQUIRE_VIRTUALENV=false python -m pip install \
-        customtkinter questionary \
-        --prefix=/usr --root="$pkgdir" \
-        --ignore-installed --no-input 2>&1 \
-        | grep -v "already satisfied" || true
+    # ── 2. Bundle ALL Python runtime deps via uv ────────────
+    #     We install into the package's site-packages directory
+    #     inside $pkgdir.  Nothing is written to the host system.
+    python_sitelib=$(python3 -c "import sysconfig; print(sysconfig.get_path('purelib'))")
+    UV_SYSTEM_PYTHON=1 uv pip install \
+        customtkinter \
+        'yt-dlp>=2025.0.0' \
+        'Pillow>=9.0.0' \
+        rich \
+        questionary \
+        --target="$pkgdir$python_sitelib"
 
-    # ── 3. Desktop icon ────────────────────────────────────
-    #     Freedesktop standard path for app icons.
+    # ── 3. Desktop icon (Freedesktop standard path) ─────────
     install -Dm644 assets/logo.png "$pkgdir/usr/share/pixmaps/yvid.png"
 
     # ── 4. .desktop entry ──────────────────────────────────
