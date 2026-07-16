@@ -319,9 +319,8 @@ class App(ctk.CTk):
 
         # window
         self.title(f"{APP_NAME}  \u2014  Video Downloader")
-        self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         self.minsize(MIN_WIDTH, MIN_HEIGHT)
-        self._center_window()
+        self.center_window(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # state
@@ -350,11 +349,19 @@ class App(ctk.CTk):
 
     # ── window helpers ──────────────────────────────────
 
-    def _center_window(self) -> None:
-        self.update_idletasks()
-        x = (self.winfo_screenwidth() - WINDOW_WIDTH) // 2
-        y = (self.winfo_screenheight() - WINDOW_HEIGHT) // 2
-        self.geometry(f"+{x}+{y}")
+    def center_window(self, width: int, height: int, window=None) -> None:
+        """Dynamically centre *window* (or ``self``) on the current screen.
+
+        Retrieves the display resolution via ``winfo_screenwidth`` /
+        ``winfo_screenheight``, computes the exact centre for the given
+        dimensions, and applies ``geometry(...)`` in one call.
+        """
+        target = window if window is not None else self
+        screen_width = target.winfo_screenwidth()
+        screen_height = target.winfo_screenheight()
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+        target.geometry(f"{width}x{height}+{x}+{y}")
 
     def _on_close(self) -> None:
         self.download_in_progress = False
@@ -1174,9 +1181,8 @@ class App(ctk.CTk):
         # Derive height: with file info → 260, generic → 190
         has_info = bool(display_name)
         pw, ph = (400, 270 if has_info else 190)
-        popup.geometry(f"{pw}x{ph}")
         popup.resizable(False, False)
-        self._center_on_parent(popup, pw, ph)
+        self.center_window(pw, ph, window=popup)
 
         # --- layout ---
         popup.grid_columnconfigure(0, weight=1)
@@ -1295,25 +1301,6 @@ class App(ctk.CTk):
                 command=popup.destroy,
             )
             dismiss_btn.grid(row=3, column=0, pady=(0, 20))
-
-    @staticmethod
-    def _center_on_parent(
-        popup: ctk.CTkToplevel,
-        pw: int,
-        ph: int,
-    ) -> None:
-        """Center *popup* over the main window without calling
-        ``update_idletasks`` on the popup (which can cause flicker)."""
-        try:
-            px = popup.master.winfo_x()
-            py = popup.master.winfo_y()
-            pw_par = popup.master.winfo_width()
-            ph_par = popup.master.winfo_height()
-            x = px + (pw_par - pw) // 2
-            y = py + (ph_par - ph) // 2
-            popup.geometry(f"+{max(x, 0)}+{max(y, 0)}")
-        except Exception:
-            pass  # best-effort centering
 
     # ── video trimming (FFmpeg stream copy) ────────────
 
