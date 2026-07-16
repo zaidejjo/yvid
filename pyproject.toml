@@ -1,13 +1,26 @@
 [project]
 name = "yvid"
 version = "1.0.0"
-description = "Modern Desktop Video Downloader — built with CustomTkinter and yt-dlp"
+description = "Modern Video Downloader — Desktop GUI + Terminal CLI"
 requires-python = ">=3.10"
 dependencies = [
     "customtkinter>=5.2.2",
     "yt-dlp>=2025.0.0",
     "Pillow>=9.0.0",
+    "rich>=13.0.0",
+    "questionary>=2.0.0",
 ]
 
 [project.urls]
 homepage = "https://github.com/user/yvid"
+
+[project.scripts]
+yvid = "cli:main"
+yvid-cli = "cli:main"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["cli", "app"]
