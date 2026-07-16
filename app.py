@@ -19,7 +19,9 @@ import re
 import shutil
 import subprocess
 import sys
-from collections.abc import Callable
+import collections.abc
+import tkinter.font as tkfont
+import tkinter.ttk as ttk
 from tkinter import filedialog, StringVar, BooleanVar
 from PIL import Image, ImageDraw
 
@@ -36,6 +38,10 @@ MIN_HEIGHT = 520
 DEFAULT_OUTPUT_DIR = os.path.expanduser("~/Videos/YVid")
 ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 ICON_SCALE = 5  # Draw at 5× resolution for crisp downscaled anti-aliasing
+
+# Explicit background colors for Linux corner-blending (prevents jagged rendering)
+BG_WINDOW = ("gray92", "gray14")  # Matches the blue-theme window background
+BG_CARD = ("gray97", "gray20")  # Slightly lighter card for the settings panel
 
 FORMAT_VIDEO_QUALITY = {
     "Best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
@@ -114,6 +120,79 @@ def format_error_message(error_str: str) -> str:
     if len(error_str) > 120:
         msg += "\u2026"
     return f"Download failed: {msg}"
+
+
+def parse_time(value: str) -> int | None:
+    """Convert *HH:MM:SS* / *MM:SS* / *SS* to total seconds.
+
+    Returns ``None`` when the value is empty or the format is invalid.
+    """
+    s = value.strip()
+    if not s:
+        return None
+    parts = s.split(":")
+    if len(parts) > 3:
+        return None
+    try:
+        parts_int = [int(p) for p in parts]
+    except ValueError:
+        return None
+    if any(p < 0 for p in parts_int):
+        return None
+    if len(parts_int) == 1:
+        return parts_int[0]
+    if len(parts_int) == 2:
+        return parts_int[0] * 60 + parts_int[1]
+    return parts_int[0] * 3600 + parts_int[1] * 60 + parts_int[2]
+
+
+# ═══════════════════════════════════════════════════════════
+#  SYSTEM FONT DETECTION  (Linux fc-match)
+# ═══════════════════════════════════════════════════════════
+
+
+def detect_system_font() -> str:
+    """Query the OS for the default sans-serif font family.
+
+    On Linux this uses ``fc-match`` (fontconfig).  On macOS / Windows
+    well-known platform fonts are returned.  Falls back to ``sans-serif``
+    which Tkinter resolves via Xft/fontconfig on most modern systems.
+    """
+    if sys.platform == "linux":
+        try:
+            out = subprocess.check_output(
+                ["fc-match", "--format=%{family[0]}", "sans-serif"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=5,
+            ).strip()
+            if out:
+                return out.split(",")[0]
+        except (
+            FileNotFoundError,
+            subprocess.TimeoutExpired,
+            subprocess.CalledProcessError,
+        ):
+            pass
+        # Well-known Linux fallbacks with excellent antialiasing
+        for candidate in ("Ubuntu", "Noto Sans", "DejaVu Sans", "Liberation Sans"):
+            try:
+                subprocess.run(
+                    ["fc-match", candidate],
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                    check=False,
+                )
+                return candidate
+            except FileNotFoundError:
+                continue
+
+    if sys.platform == "darwin":
+        return "Helvetica Neue"
+    if sys.platform == "win32":
+        return "Segoe UI"
+    return "sans-serif"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -217,7 +296,7 @@ def _draw_play(
     )
 
 
-ICON_DEFS: dict[str, tuple[int, int, Callable]] = {
+ICON_DEFS: dict[str, tuple[int, int, collections.abc.Callable]] = {
     "paste": (18, 18, _draw_paste),
     "folder": (18, 18, _draw_folder),
     "chevron_down": (12, 12, _draw_chevron_down),
@@ -339,6 +418,8 @@ class DownloadThread(threading.Thread):
             for pp in self.ydl_opts.get("postprocessors", [])
         )
 
+        # The "finished" hook fires *before* post-processing (merge,
+        # extract-audio, faststart).  We know the final extension.
         if is_audio:
             path = os.path.splitext(self._original_filename)[0] + ".mp3"
         else:
@@ -347,19 +428,44 @@ class DownloadThread(threading.Thread):
         if os.path.exists(path):
             return path
 
-        # fallback — scan output directory
+        # Fallback 1: scan the output directory for the newest
+        # media file that is *not* a temp/part file.
         outdir = os.path.dirname(self.ydl_opts.get("outtmpl", ""))
         if outdir and os.path.isdir(outdir):
-            exts = {".mp4", ".mkv", ".webm", ".mp3", ".m4a", ".ogg", ".opus", ".flac"}
-            files = [
-                os.path.join(outdir, f)
-                for f in os.listdir(outdir)
-                if os.path.splitext(f)[1].lower() in exts
-            ]
-            if files:
-                return max(files, key=os.path.getmtime)
+            VALID_EXTS = frozenset(
+                {
+                    ".mp4",
+                    ".mkv",
+                    ".webm",
+                    ".mp3",
+                    ".m4a",
+                    ".ogg",
+                    ".opus",
+                    ".flac",
+                    ".wav",
+                    ".aac",
+                }
+            )
+            try:
+                candidates = [
+                    os.path.join(outdir, f)
+                    for f in os.listdir(outdir)
+                    if (
+                        os.path.splitext(f)[1].lower() in VALID_EXTS
+                        and not f.endswith(".part")
+                        and not f.endswith(".temp")
+                    )
+                ]
+                if candidates:
+                    best = max(candidates, key=os.path.getmtime)
+                    if os.path.getsize(best) > 0:
+                        return best
+            except OSError:
+                pass
 
-        return path
+        # Fallback 2: the predicted path is our best guess even if it
+        # doesn't exist yet (post-processor might still be finalising).
+        return path if os.path.exists(path) else ""
 
 
 # ═══════════════════════════════════════════════════════════
@@ -378,6 +484,41 @@ class App(ctk.CTk):
         # theme — must be set before any widget creation
         ctk.set_appearance_mode("System")
         ctk.set_default_color_theme("blue")
+
+        # ── high-DPI support (Windows) ──
+        if sys.platform == "win32":
+            try:
+                import ctypes
+
+                ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            except Exception:
+                pass
+
+        # ── detect system font (fc-match on Linux) ──
+        self.font_family = detect_system_font()
+
+        # ── high-quality font rendering ──
+        try:
+            default_font = tkfont.nametofont("TkDefaultFont")
+            default_font.configure(family=self.font_family, size=13)
+        except Exception:
+            pass
+
+        # ── prevent native Tk border bleed ──
+        try:
+            self.tk.call("tk", "scaling", 1.0)
+        except Exception:
+            pass
+
+        # ── force themed dialog appearance (last-resort tkinter fallback) ──
+        try:
+            style = ttk.Style(self)
+            for theme_candidate in ("clam", "alt"):
+                if theme_candidate in style.theme_names():
+                    style.theme_use(theme_candidate)
+                    break
+        except Exception:
+            pass
 
         # window
         self.title(f"{APP_NAME}  \u2014  Video Downloader")
@@ -442,24 +583,30 @@ class App(ctk.CTk):
         self._build_message_label()
         self._build_play_btn()
 
+    def _font(self, size: int = 13, weight: str = "normal") -> ctk.CTkFont:
+        """Shortcut for creating a font with the detected system family."""
+        return ctk.CTkFont(family=self.font_family, size=size, weight=weight)
+
     # -- header ------------------------------------------
 
     def _build_header(self) -> None:
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, padx=30, pady=(30, 24), sticky="ew")
+        header.grid(row=0, column=0, padx=30, pady=(28, 20), sticky="ew")
         header.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
             header,
             text=APP_NAME,
-            font=ctk.CTkFont(size=22, weight="bold"),
+            font=self._font(24, "bold"),
+            bg_color="transparent",
         ).grid(row=0, column=0, sticky="w")
 
         ctk.CTkLabel(
             header,
             text="Video Downloader",
-            font=ctk.CTkFont(size=13),
+            font=self._font(13),
             text_color=("gray50", "gray60"),
+            bg_color="transparent",
         ).grid(row=1, column=0, sticky="w")
 
     # -- url input ---------------------------------------
@@ -472,23 +619,29 @@ class App(ctk.CTk):
         self.url_entry = ctk.CTkEntry(
             frame,
             placeholder_text="Paste video URL here\u2026",
-            height=42,
+            height=44,
             corner_radius=10,
-            font=ctk.CTkFont(size=14),
+            border_width=1,
+            border_color=("gray78", "gray35"),
+            fg_color=("white", "gray17"),
+            bg_color=BG_WINDOW,
+            font=self._font(14),
         )
-        self.url_entry.grid(row=0, column=0, padx=(0, 8), sticky="ew")
-
-        # bind Enter key to download
+        self.url_entry.grid(row=0, column=0, padx=(0, 10), sticky="ew")
         self.url_entry.bind("<Return>", lambda _: self._start_download())
 
         paste_icon = self.icons.get("paste")
         self.paste_btn = ctk.CTkButton(
             frame,
             text="Paste",
-            width=88,
-            height=42,
+            width=90,
+            height=44,
             corner_radius=10,
-            font=ctk.CTkFont(size=13),
+            border_width=1,
+            border_color=("#3B8ED0", "#1F6AA5"),
+            fg_color=("#3B8ED0", "#1F6AA5"),
+            bg_color=BG_WINDOW,
+            font=self._font(13),
             image=paste_icon,
             compound="left",
             command=self._paste_url,
@@ -503,29 +656,34 @@ class App(ctk.CTk):
         self.settings_header.grid_columnconfigure(0, weight=1)
         self.settings_header.grid_propagate(False)
 
-        # subtle separator
-        ctk.CTkFrame(
+        sep = ctk.CTkFrame(
             self.settings_header,
             height=1,
             fg_color=("gray85", "gray35"),
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+            corner_radius=0,
+            bg_color="transparent",
+        )
+        sep.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
         ctk.CTkLabel(
             self.settings_header,
-            text="Settings",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            text="SETTINGS",
+            font=self._font(12, "bold"),
             text_color=("gray50", "gray60"),
+            bg_color="transparent",
         ).grid(row=0, column=0, padx=(0, 6))
 
         self.settings_chevron = ctk.CTkButton(
             self.settings_header,
             text="",
-            width=26,
-            height=26,
+            width=28,
+            height=28,
             corner_radius=6,
             fg_color="transparent",
+            bg_color="transparent",
+            border_width=0,
             hover_color=("gray85", "gray30"),
-            image=self.icons.get("chevron_down"),
+            image=self.icons.get("chevron_up"),
             command=self._toggle_settings,
         )
         self.settings_chevron.grid(row=0, column=1, sticky="e")
@@ -533,7 +691,12 @@ class App(ctk.CTk):
     # -- settings panel (collapsible) ---------------------
 
     def _build_settings_panel(self) -> None:
-        sf = ctk.CTkFrame(self, corner_radius=12, fg_color=("gray97", "gray18"))
+        sf = ctk.CTkFrame(
+            self,
+            corner_radius=14,
+            fg_color=BG_CARD,
+            border_width=0,
+        )
         sf.grid(row=3, column=0, padx=30, pady=(10, 16), sticky="ew")
         sf.grid_columnconfigure(1, weight=1)
         self.settings_frame = sf
@@ -542,17 +705,23 @@ class App(ctk.CTk):
         ctk.CTkLabel(
             sf,
             text="Format",
-            font=ctk.CTkFont(size=13),
-        ).grid(row=0, column=0, padx=(16, 12), pady=(16, 6), sticky="w")
+            font=self._font(13),
+            bg_color=BG_CARD,
+        ).grid(row=0, column=0, padx=(18, 12), pady=(18, 8), sticky="w")
 
         self.format_seg = ctk.CTkSegmentedButton(
             sf,
             values=["Video MP4", "Audio MP3"],
             command=self._on_format_change,
-            font=ctk.CTkFont(size=12),
+            font=self._font(12),
             corner_radius=8,
+            border_width=1,
+            fg_color=("gray90", "gray22"),
+            selected_color=("#2979FF", "#0A84FF"),
+            selected_hover_color=("#1A6AE0", "#1A6AE0"),
+            bg_color=BG_CARD,
         )
-        self.format_seg.grid(row=0, column=1, padx=(0, 16), pady=(16, 6), sticky="ew")
+        self.format_seg.grid(row=0, column=1, padx=(0, 16), pady=(18, 8), sticky="ew")
         self.format_seg.set("Video MP4")
 
         # ---- row 1: Quality + Appearance ----
@@ -564,77 +733,168 @@ class App(ctk.CTk):
         self.quality_label = ctk.CTkLabel(
             inner1,
             text="Quality",
-            font=ctk.CTkFont(size=13),
+            font=self._font(13),
+            bg_color="transparent",
         )
-        self.quality_label.grid(row=0, column=0, padx=(16, 6), pady=4, sticky="w")
+        self.quality_label.grid(row=0, column=0, padx=(18, 8), pady=7, sticky="w")
 
         self.quality_menu = ctk.CTkOptionMenu(
             inner1,
             values=["Best", "2160p", "1080p", "720p", "480p", "360p"],
-            font=ctk.CTkFont(size=12),
+            font=self._font(12),
             corner_radius=8,
+            dropdown_font=self._font(12),
+            bg_color="transparent",
             variable=self.quality_var,
         )
-        self.quality_menu.grid(row=0, column=1, padx=(0, 16), pady=4, sticky="ew")
+        self.quality_menu.grid(row=0, column=1, padx=(0, 12), pady=7, sticky="ew")
 
         ctk.CTkLabel(
             inner1,
             text="Theme",
-            font=ctk.CTkFont(size=13),
-        ).grid(row=0, column=2, padx=(8, 6), pady=4, sticky="w")
+            font=self._font(13),
+            bg_color="transparent",
+        ).grid(row=0, column=2, padx=(4, 8), pady=7, sticky="w")
 
         self.theme_menu = ctk.CTkOptionMenu(
             inner1,
             values=["System", "Light", "Dark"],
-            font=ctk.CTkFont(size=12),
+            font=self._font(12),
             corner_radius=8,
+            dropdown_font=self._font(12),
+            bg_color="transparent",
             command=self._change_theme,
         )
-        self.theme_menu.grid(row=0, column=3, padx=(0, 16), pady=4, sticky="ew")
+        self.theme_menu.grid(row=0, column=3, padx=(0, 16), pady=7, sticky="ew")
         self.theme_menu.set("System")
 
         # ---- row 2: Subtitles ----
         self.subs_check = ctk.CTkCheckBox(
             sf,
             text="Download subtitles (if available)",
-            font=ctk.CTkFont(size=13),
+            font=self._font(13),
             variable=self.subs_var,
             corner_radius=4,
+            border_width=1,
+            border_color=("gray75", "gray38"),
+            bg_color=BG_CARD,
             onvalue=True,
             offvalue=False,
         )
         self.subs_check.grid(
-            row=2, column=0, columnspan=2, padx=(16, 16), pady=(4, 6), sticky="w"
+            row=2,
+            column=0,
+            columnspan=2,
+            padx=(18, 16),
+            pady=(6, 8),
+            sticky="w",
         )
 
-        # ---- row 3: Output ----
+        # ---- row 3: Trim times ----
+        self.trim_label = ctk.CTkLabel(
+            sf,
+            text="Trim",
+            font=self._font(13),
+            bg_color=BG_CARD,
+        )
+        self.trim_label.grid(row=3, column=0, padx=(18, 12), pady=(6, 6), sticky="w")
+
+        self.trim_frame = ctk.CTkFrame(sf, fg_color="transparent")
+        self.trim_frame.grid(row=3, column=1, padx=(0, 16), pady=(6, 6), sticky="ew")
+        self.trim_frame.grid_columnconfigure(1, weight=1)
+        self.trim_frame.grid_columnconfigure(3, weight=1)
+
+        ctk.CTkLabel(
+            self.trim_frame,
+            text="Start",
+            font=self._font(12),
+            text_color=("gray50", "gray60"),
+            bg_color="transparent",
+        ).grid(row=0, column=0, padx=(0, 4), sticky="w")
+
+        self.trim_start_entry = ctk.CTkEntry(
+            self.trim_frame,
+            placeholder_text="HH:MM:SS",
+            width=100,
+            height=34,
+            corner_radius=8,
+            border_width=1,
+            border_color=("gray82", "gray35"),
+            fg_color=("white", "gray17"),
+            bg_color="transparent",
+            font=self._font(12),
+        )
+        self.trim_start_entry.grid(
+            row=0,
+            column=1,
+            padx=(0, 12),
+            sticky="ew",
+        )
+
+        ctk.CTkLabel(
+            self.trim_frame,
+            text="End",
+            font=self._font(12),
+            text_color=("gray50", "gray60"),
+            bg_color="transparent",
+        ).grid(row=0, column=2, padx=(0, 4), sticky="w")
+
+        self.trim_end_entry = ctk.CTkEntry(
+            self.trim_frame,
+            placeholder_text="HH:MM:SS",
+            width=100,
+            height=34,
+            corner_radius=8,
+            border_width=1,
+            border_color=("gray82", "gray35"),
+            fg_color=("white", "gray17"),
+            bg_color="transparent",
+            font=self._font(12),
+        )
+        self.trim_end_entry.grid(
+            row=0,
+            column=3,
+            sticky="ew",
+        )
+
+        # ---- row 4: Output ----
         ctk.CTkLabel(
             sf,
             text="Output",
-            font=ctk.CTkFont(size=13),
-        ).grid(row=3, column=0, padx=(16, 12), pady=(4, 16), sticky="w")
+            font=self._font(13),
+            bg_color=BG_CARD,
+        ).grid(row=4, column=0, padx=(18, 12), pady=(4, 18), sticky="w")
 
         out_frame = ctk.CTkFrame(sf, fg_color="transparent")
-        out_frame.grid(row=3, column=1, padx=(0, 16), pady=(4, 16), sticky="ew")
+        out_frame.grid(row=4, column=1, padx=(0, 16), pady=(4, 18), sticky="ew")
         out_frame.grid_columnconfigure(0, weight=1)
 
         self.output_entry = ctk.CTkEntry(
             out_frame,
             textvariable=self.output_var,
-            font=ctk.CTkFont(size=12),
-            height=32,
+            font=self._font(12),
+            height=34,
             corner_radius=8,
+            border_width=1,
+            border_color=("gray82", "gray35"),
+            fg_color=("white", "gray17"),
+            bg_color="transparent",
             state="readonly",
         )
-        self.output_entry.grid(row=0, column=0, padx=(0, 6), sticky="ew")
+        self.output_entry.grid(row=0, column=0, padx=(0, 8), sticky="ew")
 
         self.browse_btn = ctk.CTkButton(
             out_frame,
             text="Browse",
-            width=78,
-            height=32,
-            font=ctk.CTkFont(size=12),
+            width=82,
+            height=34,
             corner_radius=8,
+            border_width=1,
+            border_color=("gray82", "gray35"),
+            fg_color=("gray97", "gray24"),
+            hover_color=("gray88", "gray30"),
+            bg_color="transparent",
+            font=self._font(12),
             image=self.icons.get("folder"),
             compound="left",
             command=self._browse_output,
@@ -647,9 +907,14 @@ class App(ctk.CTk):
         self.download_btn = ctk.CTkButton(
             self,
             text="Download",
-            height=46,
+            height=48,
             corner_radius=10,
-            font=ctk.CTkFont(size=15, weight="bold"),
+            border_width=1,
+            border_color=("#1A6AE0", "#0A6AE0"),
+            fg_color=("#2979FF", "#0A84FF"),
+            hover_color=("#1A6AE0", "#0073E0"),
+            bg_color=BG_WINDOW,
+            font=self._font(15, "bold"),
             image=self.icons.get("download"),
             compound="left",
             command=self._start_download,
@@ -666,6 +931,10 @@ class App(ctk.CTk):
             self.progress_frame,
             height=8,
             corner_radius=4,
+            border_width=0,
+            fg_color=("gray85", "gray28"),
+            progress_color=("#2979FF", "#0A84FF"),
+            bg_color="transparent",
             mode="determinate",
         )
         self.progress_bar.grid(row=0, column=0, padx=0, pady=(0, 8), sticky="ew")
@@ -678,29 +947,31 @@ class App(ctk.CTk):
         self.percent_label = ctk.CTkLabel(
             stats,
             text="",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            width=60,
+            font=self._font(14, "bold"),
+            width=62,
             anchor="w",
+            bg_color="transparent",
         )
         self.percent_label.grid(row=0, column=0, sticky="w")
 
         self.speed_label = ctk.CTkLabel(
             stats,
             text="",
-            font=ctk.CTkFont(size=13),
+            font=self._font(13),
             anchor="center",
+            bg_color="transparent",
         )
         self.speed_label.grid(row=0, column=1, sticky="ew")
 
         self.eta_label = ctk.CTkLabel(
             stats,
             text="",
-            font=ctk.CTkFont(size=13),
+            font=self._font(13),
             anchor="e",
+            bg_color="transparent",
         )
         self.eta_label.grid(row=0, column=2, sticky="e")
 
-        # hidden until download starts
         self.progress_frame.grid_remove()
 
     # -- message label -----------------------------------
@@ -709,10 +980,11 @@ class App(ctk.CTk):
         self.message_label = ctk.CTkLabel(
             self,
             text="",
-            font=ctk.CTkFont(size=13),
+            font=self._font(13),
             anchor="w",
+            bg_color=BG_WINDOW,
         )
-        self.message_label.grid(row=6, column=0, padx=30, pady=(0, 8), sticky="ew")
+        self.message_label.grid(row=6, column=0, padx=30, pady=(4, 8), sticky="ew")
 
     # -- play button -------------------------------------
 
@@ -722,15 +994,17 @@ class App(ctk.CTk):
             text="Play with mpv",
             height=38,
             corner_radius=10,
-            font=ctk.CTkFont(size=13),
+            border_width=1,
+            border_color=("gray82", "gray35"),
+            fg_color=("gray88", "gray28"),
+            hover_color=("gray78", "gray35"),
+            text_color=("gray15", "gray85"),
+            bg_color=BG_WINDOW,
+            font=self._font(13),
             image=self.icons.get("play"),
             compound="left",
             command=self._play_video,
-            fg_color=("gray85", "gray30"),
-            text_color=("gray15", "gray85"),
-            hover_color=("gray75", "gray40"),
         )
-        # hidden after download completes
         self.play_btn.grid_remove()
 
     # ── settings toggle ─────────────────────────────────
@@ -738,11 +1012,11 @@ class App(ctk.CTk):
     def _toggle_settings(self) -> None:
         if self._settings_visible:
             self.settings_frame.grid_remove()
-            self.settings_chevron.configure(image=self.icons.get("chevron_up"))
+            self.settings_chevron.configure(image=self.icons.get("chevron_down"))
             self._settings_visible = False
         else:
             self.settings_frame.grid()
-            self.settings_chevron.configure(image=self.icons.get("chevron_down"))
+            self.settings_chevron.configure(image=self.icons.get("chevron_up"))
             self._settings_visible = True
 
     def _on_format_change(self, value: str) -> None:
@@ -750,10 +1024,14 @@ class App(ctk.CTk):
             self.quality_label.grid_remove()
             self.quality_menu.grid_remove()
             self.subs_check.grid_remove()
+            self.trim_label.grid_remove()
+            self.trim_frame.grid_remove()
         else:
             self.quality_label.grid()
             self.quality_menu.grid()
             self.subs_check.grid()
+            self.trim_label.grid()
+            self.trim_frame.grid()
 
     def _change_theme(self, mode: str) -> None:
         ctk.set_appearance_mode(mode)
@@ -770,13 +1048,90 @@ class App(ctk.CTk):
             pass
 
     def _browse_output(self) -> None:
-        directory = filedialog.askdirectory(
-            title="Select Download Directory",
-            initialdir=self.output_var.get() or DEFAULT_OUTPUT_DIR,
-            parent=self,
-        )
+        directory = self._pick_directory_native()
         if directory:
             self.output_var.set(directory)
+
+    def _pick_directory_native(self) -> str:
+        """Open the OS-native directory picker.
+
+        Priority (Linux):
+          1. ``zenity`` (GNOME) — subprocess
+          2. ``kdialog`` (KDE)  — subprocess
+          3. Tkinter ``filedialog.askdirectory`` with the ``clam`` theme
+             (looks acceptable on modern Linux DEs).
+
+        macOS / Windows → ``filedialog.askdirectory`` is already native.
+        """
+        initial = self.output_var.get() or DEFAULT_OUTPUT_DIR
+
+        # -- Linux: try zenity / kdialog first ------------
+        if sys.platform == "linux":
+            try:
+                out = subprocess.check_output(
+                    [
+                        "zenity",
+                        "--file-selection",
+                        "--directory",
+                        "--title=Select Download Directory",
+                        f"--filename={initial}/",
+                    ],
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    timeout=30,
+                ).strip()
+                if out:
+                    return out
+            except (
+                FileNotFoundError,
+                subprocess.TimeoutExpired,
+                subprocess.CalledProcessError,
+            ):
+                pass
+
+            try:
+                out = subprocess.check_output(
+                    ["kdialog", "--getexistingdirectory", initial],
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    timeout=30,
+                ).strip()
+                if out:
+                    return out
+            except (
+                FileNotFoundError,
+                subprocess.TimeoutExpired,
+                subprocess.CalledProcessError,
+            ):
+                pass
+
+            # -- themed tkinter fallback ------------------
+            try:
+                style = ttk.Style(self)
+                old_theme = style.theme_use()
+                for name in ("clam", "alt"):
+                    if name in style.theme_names():
+                        style.theme_use(name)
+                        break
+                directory = filedialog.askdirectory(
+                    title="Select Download Directory",
+                    initialdir=initial,
+                    parent=self,
+                )
+                style.theme_use(old_theme)
+                return directory or ""
+            except Exception:
+                pass
+
+        # -- macOS / Windows / last-resort ----------------
+        return (
+            filedialog.askdirectory(
+                title="Select Download Directory",
+                initialdir=initial,
+                parent=self,
+            )
+            or ""
+        )
 
     # ── download orchestration ──────────────────────────
 
@@ -862,39 +1217,42 @@ class App(ctk.CTk):
     # ── progress polling ────────────────────────────────
 
     def _poll_queue(self) -> None:
-        if not self.download_in_progress:
-            self.after(100, self._poll_queue)
-            return
-
         try:
-            while True:
-                d = self.progress_queue.get_nowait()
+            if not self.download_in_progress:
+                return
 
-                if d["status"] == "downloading":
-                    self._update_progress(
-                        d.get("percent", 0),
-                        d.get("speed", 0),
-                        d.get("eta", 0),
-                    )
+            try:
+                while True:
+                    d = self.progress_queue.get_nowait()
 
-                elif d["status"] == "post_processing":
-                    self.progress_bar.set(1.0)
-                    self.percent_label.configure(text="Processing\u2026")
-                    self.speed_label.configure(text="")
-                    self.eta_label.configure(text="")
+                    if d["status"] == "downloading":
+                        self._update_progress(
+                            d.get("percent", 0),
+                            d.get("speed", 0),
+                            d.get("eta", 0),
+                        )
 
-                elif d["status"] == "completed":
-                    self._on_download_complete(d.get("output_path", ""))
-                    return
+                    elif d["status"] == "post_processing":
+                        self.progress_bar.set(1.0)
+                        self.percent_label.configure(text="Processing\u2026")
+                        self.speed_label.configure(text="")
+                        self.eta_label.configure(text="")
 
-                elif d["status"] == "error":
-                    self._on_download_error(d.get("message", "Unknown error"))
-                    return
+                    elif d["status"] == "completed":
+                        self._on_download_complete(d.get("output_path", ""))
+                        return
 
-        except queue.Empty:
-            pass
+                    elif d["status"] == "error":
+                        self._on_download_error(d.get("message", "Unknown error"))
+                        return
 
-        self.after(100, self._poll_queue)
+            except queue.Empty:
+                pass
+
+        finally:
+            # Always reschedule — this also fires after return above,
+            # so the polling chain never breaks between downloads.
+            self.after(100, self._poll_queue)
 
     # ── progress display updates ────────────────────────
 
@@ -934,14 +1292,311 @@ class App(ctk.CTk):
         self.speed_label.configure(text="Complete")
         self.eta_label.configure(text="")
 
-        self._show_message("Download complete!", error=False)
+        # Clear the message label — the popup replaces it
+        self._clear_message()
 
-        if output_path and os.path.exists(output_path):
-            self.last_output_path = output_path
-            self.play_btn.grid(row=7, column=0, padx=30, pady=(4, 0), sticky="w")
+        path_ok = bool(output_path) and os.path.exists(output_path)
+
+        if path_ok:
+            # Attempt trimming before showing the popup
+            trimmed = self._trim_video(output_path)
+            self.last_output_path = trimmed if trimmed else output_path
+            self.play_btn.grid(
+                row=7,
+                column=0,
+                padx=30,
+                pady=(4, 0),
+                sticky="w",
+            )
         else:
             self.last_output_path = ""
             self.play_btn.grid_remove()
+
+        # Show popup with a catch-all fallback
+        try:
+            if path_ok:
+                self._show_success_popup(output_path)
+            else:
+                self._show_success_popup("")
+        except Exception:
+            # If the popup itself fails for any reason, fall back to the
+            # inline message label so the user still sees feedback.
+            if path_ok:
+                self._show_message("Download completed successfully.", error=False)
+            else:
+                self._show_message(
+                    "Download completed, but file was not found.", error=True
+                )
+
+    # ── success popup (CTkToplevel) ─────────────────────
+
+    def _show_success_popup(self, filepath: str) -> None:
+        """Display a non-blocking, topmost completion popup.
+
+        If *filepath* is empty or the file is missing, a simplified popup
+        is shown without file-specific details.
+        """
+        file_exists = bool(filepath) and os.path.exists(filepath)
+
+        # --- metadata for display ---
+        if file_exists:
+            filename = os.path.basename(filepath)
+            display_name = filename if len(filename) <= 55 else filename[:52] + "..."
+            saved_dir = os.path.dirname(filepath)
+            short_dir = saved_dir.replace(os.path.expanduser("~"), "~")
+        else:
+            display_name = ""
+            short_dir = ""
+
+        # --- build popup ---
+        popup = ctk.CTkToplevel(self)
+        popup.title("Download Complete")
+        popup.attributes("-topmost", True)
+        popup.transient(self)
+        popup.grab_set()
+        popup.focus_set()
+        popup.protocol("WM_DELETE_WINDOW", popup.destroy)
+
+        # Derive height: with file info → 260, generic → 190
+        has_info = bool(display_name)
+        pw, ph = (400, 270 if has_info else 190)
+        popup.geometry(f"{pw}x{ph}")
+        popup.resizable(False, False)
+        self._center_on_parent(popup, pw, ph)
+
+        # --- layout ---
+        popup.grid_columnconfigure(0, weight=1)
+
+        # Icon (safe lookup)
+        try:
+            icon_img = self.icons.get("download")
+        except Exception:
+            icon_img = None
+        if icon_img:
+            ctk.CTkLabel(
+                popup,
+                text="",
+                image=icon_img,
+                fg_color="transparent",
+                bg_color="transparent",
+            ).grid(row=0, column=0, pady=(28, 8))
+
+        # Heading
+        ctk.CTkLabel(
+            popup,
+            text="Download Completed",
+            font=self._font(18, "bold"),
+            bg_color="transparent",
+        ).grid(row=1, column=0, padx=30, pady=(0, 2))
+
+        if has_info:
+            # Filename
+            ctk.CTkLabel(
+                popup,
+                text=display_name,
+                font=self._font(13),
+                text_color=("gray50", "gray60"),
+                wraplength=340,
+                bg_color="transparent",
+            ).grid(row=2, column=0, padx=30, pady=(0, 2))
+
+            # Directory
+            ctk.CTkLabel(
+                popup,
+                text=f"Saved to  {short_dir}",
+                font=self._font(11),
+                text_color=("gray45", "gray55"),
+                wraplength=340,
+                bg_color="transparent",
+            ).grid(row=3, column=0, padx=30, pady=(0, 20))
+
+            # --- buttons (with file info) ---
+            btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
+            btn_frame.grid(row=4, column=0, padx=30, pady=(0, 22))
+
+            def _play_and_close() -> None:
+                popup.destroy()
+                self._play_video()
+
+            play_btn = ctk.CTkButton(
+                btn_frame,
+                text="Play",
+                width=110,
+                height=36,
+                corner_radius=8,
+                border_width=1,
+                border_color=("#1A6AE0", "#0A6AE0"),
+                fg_color=("#2979FF", "#0A84FF"),
+                hover_color=("#1A6AE0", "#0073E0"),
+                font=self._font(13, "bold"),
+                image=self.icons.get("play"),
+                compound="left",
+                command=_play_and_close,
+            )
+            play_btn.pack(side="left", padx=(0, 8))
+
+            dismiss_btn = ctk.CTkButton(
+                btn_frame,
+                text="Dismiss",
+                width=110,
+                height=36,
+                corner_radius=8,
+                border_width=1,
+                border_color=("gray82", "gray35"),
+                fg_color=("gray88", "gray28"),
+                hover_color=("gray78", "gray35"),
+                text_color=("gray15", "gray85"),
+                font=self._font(13),
+                command=popup.destroy,
+            )
+            dismiss_btn.pack(side="left", padx=(8, 0))
+
+            # Keyboard shortcuts
+            popup.bind("<Return>", lambda _: _play_and_close())
+            popup.bind("<Escape>", lambda _: popup.destroy())
+
+        else:
+            # Generic popup — no file details, just Dismiss
+            ctk.CTkLabel(
+                popup,
+                text="Your download has finished successfully.",
+                font=self._font(13),
+                text_color=("gray50", "gray60"),
+                wraplength=320,
+                bg_color="transparent",
+            ).grid(row=2, column=0, padx=30, pady=(12, 20))
+
+            dismiss_btn = ctk.CTkButton(
+                popup,
+                text="Dismiss",
+                width=120,
+                height=36,
+                corner_radius=8,
+                border_width=1,
+                border_color=("gray82", "gray35"),
+                fg_color=("gray88", "gray28"),
+                hover_color=("gray78", "gray35"),
+                text_color=("gray15", "gray85"),
+                font=self._font(13),
+                command=popup.destroy,
+            )
+            dismiss_btn.grid(row=3, column=0, pady=(0, 20))
+
+    @staticmethod
+    def _center_on_parent(
+        popup: ctk.CTkToplevel,
+        pw: int,
+        ph: int,
+    ) -> None:
+        """Center *popup* over the main window without calling
+        ``update_idletasks`` on the popup (which can cause flicker)."""
+        try:
+            px = popup.master.winfo_x()
+            py = popup.master.winfo_y()
+            pw_par = popup.master.winfo_width()
+            ph_par = popup.master.winfo_height()
+            x = px + (pw_par - pw) // 2
+            y = py + (ph_par - ph) // 2
+            popup.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        except Exception:
+            pass  # best-effort centering
+
+    # ── video trimming (FFmpeg stream copy) ────────────
+
+    def _trim_video(self, input_path: str) -> str | None:
+        """Trim the downloaded file if the user entered start/end times.
+
+        Uses ``ffmpeg -c copy`` (stream copy) so the operation is near
+        instantaneous and lossless.  The original file is **replaced**
+        in-place with the trimmed version.
+
+        Returns the final path (same as *input_path* on success,
+        *input_path* unchanged on skip/failure, or ``None`` if the
+        file disappeared).
+        """
+        if not input_path or not os.path.isfile(input_path):
+            return None
+
+        start_raw = self.trim_start_entry.get().strip()
+        end_raw = self.trim_end_entry.get().strip()
+
+        if not start_raw and not end_raw:
+            return input_path  # nothing to trim
+
+        if not shutil.which("ffmpeg"):
+            self._show_message(
+                "FFmpeg is required for trimming. Install FFmpeg and retry.",
+                error=True,
+            )
+            return input_path
+
+        # Validate time formats
+        start = parse_time(start_raw)
+        if start_raw and start is None:
+            self._show_message("Invalid trim Start time. Use HH:MM:SS.", error=True)
+            return input_path
+
+        end = parse_time(end_raw)
+        if end_raw and end is None:
+            self._show_message("Invalid trim End time. Use HH:MM:SS.", error=True)
+            return input_path
+
+        # Build FFmpeg command — stream copy (-c copy) for speed
+        cmd = ["ffmpeg", "-y"]
+        if start is not None:
+            cmd.extend(["-ss", start_raw])
+        cmd.extend(["-i", input_path])
+        if end is not None:
+            cmd.extend(["-to", end_raw])
+        cmd.extend(["-c", "copy", input_path])
+
+        # Show trim status on progress bar
+        self.progress_bar.set(1.0)
+        self.percent_label.configure(text="Trimming\u2026")
+        self.speed_label.configure(text="")
+        self.eta_label.configure(text="")
+        self.update_idletasks()
+
+        proc: subprocess.Popen | None = None
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+            _, stderr_data = proc.communicate(timeout=300)
+
+            if proc.returncode != 0:
+                err_tail = stderr_data.decode("utf-8", errors="replace")[-200:].strip()
+                self._show_message(
+                    f"Trim failed: {err_tail}",
+                    error=True,
+                )
+                return input_path
+
+            if not os.path.isfile(input_path) or os.path.getsize(input_path) == 0:
+                self._show_message(
+                    "Trim produced an empty file. Keeping original.",
+                    error=True,
+                )
+                return input_path
+
+            # Restore the 100 % label
+            self.percent_label.configure(text="100%")
+            self.speed_label.configure(text="Complete")
+            return input_path
+
+        except subprocess.TimeoutExpired:
+            if proc is not None:
+                proc.kill()
+            self._show_message("Trim timed out after 5 minutes.", error=True)
+            return input_path
+        except Exception as exc:
+            self._show_message(
+                f"Trim error: {str(exc)[:120]}",
+                error=True,
+            )
+            return input_path
 
     def _on_download_error(self, message: str) -> None:
         self.download_in_progress = False
@@ -988,8 +1643,31 @@ class App(ctk.CTk):
 
 
 def main() -> None:
-    ctk.set_widget_scaling(1.0)
-    ctk.set_window_scaling(1.0)
+    # ── High-DPI support (Windows) ──
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            pass
+
+    # ── Performance / rendering hints ──
+    try:
+        import tkinter as tk
+
+        root = tk.Tk()
+        scaling = root.winfo_pixels("1i") / 72.0
+        if scaling > 1.25:
+            ctk.set_widget_scaling(scaling)
+            ctk.set_window_scaling(scaling)
+        else:
+            ctk.set_widget_scaling(1.0)
+            ctk.set_window_scaling(1.0)
+        root.destroy()
+    except Exception:
+        ctk.set_widget_scaling(1.0)
+        ctk.set_window_scaling(1.0)
 
     app = App()
     app.mainloop()
