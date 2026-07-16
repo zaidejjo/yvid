@@ -1,0 +1,13 @@
+[project]
+name = "yvid"
+version = "1.0.0"
+description = "Modern Desktop Video Downloader — built with CustomTkinter and yt-dlp"
+requires-python = ">=3.10"
+dependencies = [
+    "customtkinter>=5.2.2",
+    "yt-dlp>=2025.0.0",
+    "Pillow>=9.0.0",
+]
+
+[project.urls]
+homepage = "https://github.com/user/yvid"
