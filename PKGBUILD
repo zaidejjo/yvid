@@ -5,6 +5,18 @@
 # ===================================
 # Build from source (GitHub release tag) using PEP 517.
 #
+# Dependency strategy
+# -------------------
+# Packages in official Arch repos  → listed in `depends` (pacman-managed)
+# Packages only in AUR / PyPI      → installed via pip at build time
+#
+# Arch packages used:
+#   python-pillow, python-rich     [extra]
+#   yt-dlp                         [extra]  (not python-yt-dlp)
+#   python, ffmpeg                 [core, extra]
+#
+# PyPI-only:  customtkinter, questionary
+#
 # Installs:
 #   yvid           — terminal CLI (interactive TUI + direct args)
 #   yvid-gui       — desktop GUI (CustomTkinter)
@@ -12,10 +24,10 @@
 #   /usr/share/pixmaps/yvid.png
 #   /usr/share/applications/yvid.desktop
 #
-# To build:
+# Build:
 #   makepkg -si
 #
-# To verify:
+# Verify with namcap:
 #   namcap PKGBUILD
 #   namcap yvid-*.pkg.tar.zst
 
@@ -26,25 +38,28 @@ pkgdesc="Modern Video Downloader — Desktop GUI + Terminal CLI"
 arch=('any')
 url="https://github.com/zaidejjo/yvid"
 license=('MIT')
+
+# ── Official Arch repo dependencies ──────────────────────────
 depends=(
     'python'
-    'python-customtkinter'
-    'python-yt-dlp'
+    'yt-dlp'
     'python-pillow'
     'python-rich'
-    'python-questionary'
     'ffmpeg'
 )
+
 makedepends=(
     'python-build'
     'python-installer'
     'python-wheel'
     'python-setuptools'
+    'python-pip'
 )
+
 optdepends=(
-    'gnome-terminal: default terminal for yvid-gui fallback'
     'xdg-utils: opening downloaded files from the CLI'
 )
+
 source=("$pkgname-$pkgver.tar.gz::https://github.com/zaidejjo/yvid/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 # ^ SKIP is acceptable for AUR (source integrity is trust-on-first-use).
@@ -52,6 +67,16 @@ sha256sums=('SKIP')
 
 build() {
     cd "$srcdir/$pkgname-$pkgver"
+
+    # ── AUR-only Python deps ──────────────────────────────
+    # These packages are NOT in the official Arch repositories.
+    # Install them from PyPI so the build can resolve all imports.
+    PIP_REQUIRE_VIRTUALENV=false python -m pip install \
+        customtkinter questionary \
+        --break-system-packages --no-input 2>&1 \
+        | grep -v "already satisfied" || true
+
+    # ── Build wheel (--no-isolation: use system Python libs) ──
     python -m build --wheel --no-isolation
 }
 
@@ -68,12 +93,21 @@ package() {
     #     and installs the Python modules into site-packages.
     python -m installer --destdir="$pkgdir" dist/*.whl
 
-    # ── 2. Desktop icon ────────────────────────────────────
+    # ── 2. Ship AUR-only Python libs inside our package ────
+    #     customtkinter and questionary are not available via
+    #     pacman, so we bundle them so the user has everything
+    #     they need after `pacman -U`.
+    PIP_REQUIRE_VIRTUALENV=false python -m pip install \
+        customtkinter questionary \
+        --prefix=/usr --root="$pkgdir" \
+        --ignore-installed --no-input 2>&1 \
+        | grep -v "already satisfied" || true
+
+    # ── 3. Desktop icon ────────────────────────────────────
     #     Freedesktop standard path for app icons.
     install -Dm644 assets/logo.png "$pkgdir/usr/share/pixmaps/yvid.png"
 
-    # ── 3. .desktop entry ──────────────────────────────────
-    #     Registered category: AudioVideo;Video;Network;
+    # ── 4. .desktop entry ──────────────────────────────────
     install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/yvid.desktop" <<'DESKTOP_EOF'
 [Desktop Entry]
 Type=Application
