@@ -378,6 +378,7 @@ class App(ctk.CTk):
                 self.iconbitmap(ico_path)
             elif os.path.isfile(icon_path):
                 img = Image.open(icon_path)
+                img = img.resize((32, 32), Image.Resampling.LANCZOS)
                 self.tk.call("wm", "iconphoto", self._w, ImageTk.PhotoImage(img))
         except Exception:
             pass  # non-critical
