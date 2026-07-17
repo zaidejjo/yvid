@@ -13,6 +13,7 @@ dependencies = [
     "Pillow>=9.0.0",
     "rich>=13.0.0",
     "questionary>=2.0.0",
+    "colorama>=0.4.6",
 ]
 
 [project.urls]
@@ -74,6 +75,7 @@ requires = [
     "Pillow>=9.0.0",
     "rich>=13.0.0",
     "questionary>=2.0.0",
+    "colorama>=0.4.6",
 ]
 console_app = false
 
