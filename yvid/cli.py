@@ -619,6 +619,10 @@ theme_color = "#007AFF"
         else:
             c["output_dir"] = self._get_output_dir()
 
+        # ── Cookies (auth bypass, from CLI or default "all") ─
+        c["cookies_from_browser"] = a.cookies_from_browser or ""
+        c["cookies_file"] = a.cookies_file or ""
+
         # ── Summary + confirmation ─────────────────────────
         if not self._all_flags_provided():
             self._show_summary(c)
@@ -726,6 +730,15 @@ theme_color = "#007AFF"
             # Feature 5: Skip already-downloaded videos
             "download_archive": os.path.join(self._get_config_dir(), "archive.txt"),
         }
+
+        # ── Automatic cookies (frictionless bot bypass) ─────
+        if self.config.get("cookies_file"):
+            ydl_opts["cookiefile"] = self.config["cookies_file"]
+        elif self.config.get("cookies_from_browser"):
+            ydl_opts["cookiesfrombrowser"] = (self.config["cookies_from_browser"],)
+        else:
+            # Default: attempt all known browsers in order
+            ydl_opts["cookiesfrombrowser"] = ("all",)
 
         if is_audio:
             ydl_opts["format"] = "bestaudio/best"
@@ -1144,10 +1157,25 @@ theme_color = "#007AFF"
         msg = str(exc)
         self.console.print(f"\n  [red]{_NF_X}  {msg}[/red]\n")
 
-        if "403" in msg or "age-restricted" in msg or "private" in msg.lower():
+        # ── Auto-update on signature / bot / extraction errors ──
+        auto_update_patterns = (
+            "Sign in to confirm",
+            "confirm you",
+            "confirm you're not a bot",
+            "bot",
+            "unable to extract",
+            "HTTP Error 403",
+            "403",
+            "age-restricted",
+            "private video",
+        )
+        if any(p in msg for p in auto_update_patterns):
+            self._yellow(
+                f"{_NF_R}  Updating engine to bypass YouTube restrictions\u2026"
+            )
             if self._try_update_ytdlp():
-                self._green("Ready to retry.")
                 return True
+            # Update didn't help — fall through to the retry prompt
 
         choice = _ask("confirm", "Retry?", default=False).ask()
         return bool(choice)
@@ -1223,6 +1251,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output",
         help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
+    )
+    parser.add_argument(
+        "--cookies-from-browser",
+        choices=(
+            "brave",
+            "chrome",
+            "chromium",
+            "edge",
+            "firefox",
+            "opera",
+            "safari",
+            "vivaldi",
+            "whale",
+        ),
+        default=None,
+        help="Browser to extract cookies from (default: auto-detect all)",
+    )
+    parser.add_argument(
+        "--cookies",
+        dest="cookies_file",
+        default=None,
+        help="Path to Netscape-format cookies.txt file",
     )
     return parser.parse_args(argv)
 
