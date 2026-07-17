@@ -1,0 +1,21 @@
+name: Publish to AUR
+
+on:
+  release:
+    types: [published] # يعمل تلقائياً عند نشر Release جديد على GitHub
+
+jobs:
+  aur:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Publish to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: yvid
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_username: zaidejjo
+          commit_email: zaidejjodev@gmail.com
+          update_terminator: true
