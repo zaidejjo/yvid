@@ -9,11 +9,17 @@ authors = [
 ]
 dependencies = [
     "customtkinter>=5.2.2",
-    "yt-dlp>=2025.0.0",
+    "yt-dlp>=2025.01.01",
     "Pillow>=9.0.0",
     "rich>=13.0.0",
     "questionary>=2.0.0",
     "colorama>=0.4.6",
+    "secretstorage>=3.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
 ]
 
 [project.urls]
@@ -71,11 +77,12 @@ icon = "assets/logo"
 sources = ["yvid"]
 requires = [
     "customtkinter>=5.2.2",
-    "yt-dlp>=2025.0.0",
+    "yt-dlp>=2025.01.01",
     "Pillow>=9.0.0",
     "rich>=13.0.0",
     "questionary>=2.0.0",
     "colorama>=0.4.6",
+    "secretstorage>=3.5.0",
 ]
 console_app = false
 

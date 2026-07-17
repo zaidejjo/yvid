@@ -40,6 +40,7 @@ from .core.helpers import (
     format_error_message,
     is_valid_url,
     parse_time,
+    safe_extract_cookies_browser,
 )
 from .core.download_thread import DownloadThread
 
@@ -1004,8 +1005,15 @@ class App(ctk.CTk):
             "ignore_errors": False,
         }
 
+        # ── Automatic cookies (frictionless bot bypass) ─────
+        working_browser = safe_extract_cookies_browser()
+        if working_browser:
+            ydl_opts["cookiesfrombrowser"] = (working_browser,)
+        else:
+            ydl_opts["cookiesfrombrowser"] = ("all",)
+
         if is_audio:
-            ydl_opts["format"] = "bestaudio/best"
+            ydl_opts["format"] = "bestaudio/bestvideo+bestaudio/best"
             ydl_opts["postprocessors"] = [
                 {
                     "key": "FFmpegExtractAudio",

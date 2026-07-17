@@ -80,7 +80,11 @@ def parse_time(value: str) -> int | None:
     if len(parts_int) == 1:
         return parts_int[0]
     if len(parts_int) == 2:
+        if parts_int[1] >= 60:
+            return None
         return parts_int[0] * 60 + parts_int[1]
+    if parts_int[1] >= 60 or parts_int[2] >= 60:
+        return None
     return parts_int[0] * 3600 + parts_int[1] * 60 + parts_int[2]
 
 
@@ -94,3 +98,34 @@ def _check_ffmpeg() -> bool:
     from shutil import which
 
     return which("ffmpeg") is not None
+
+
+# ── Browser cookie extraction ─────────────────────────────
+
+
+def safe_extract_cookies_browser() -> str | None:
+    """Try each popular browser in order; return the first that yields cookies.
+
+    Silently skips browsers that are not installed, have locked databases,
+    or raise any other exception.  Returns ``None`` when every browser
+    failed, so the caller can fall back to ``("all",)``.
+    """
+    import yt_dlp.cookies
+
+    browsers_to_try = (
+        "brave",
+        "firefox",
+        "chrome",
+        "chromium",
+        "edge",
+        "opera",
+        "vivaldi",
+    )
+    for browser in browsers_to_try:
+        try:
+            cookies = yt_dlp.cookies.extract_cookies_from_browser(browser)
+            if cookies:
+                return browser
+        except Exception:  # noqa: BLE001
+            continue
+    return None
