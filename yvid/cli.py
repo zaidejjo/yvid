@@ -737,8 +737,34 @@ theme_color = "#007AFF"
         elif self.config.get("cookies_from_browser"):
             ydl_opts["cookiesfrombrowser"] = (self.config["cookies_from_browser"],)
         else:
-            # Default: attempt all known browsers in order
-            ydl_opts["cookiesfrombrowser"] = ("all",)
+            # البحث الذكي والآمن عن أول متصفح يحتوي على كوكيز لتجنب الانهيار والـ Database Lock
+            import yt_dlp.cookies
+
+            working_browser = None
+            browsers_to_try = [
+                "brave",
+                "firefox",
+                "chrome",
+                "chromium",
+                "edge",
+                "opera",
+                "vivaldi",
+            ]
+
+            for browser in browsers_to_try:
+                try:
+                    # نتحقق صامتاً إذا كان المتصفح قادراً على توفير الكوكيز
+                    cookies = yt_dlp.cookies.extract_cookies_from_browser(browser)
+                    if cookies:
+                        working_browser = browser
+                        break
+                except Exception:
+                    continue
+
+            if working_browser:
+                ydl_opts["cookiesfrombrowser"] = (working_browser,)
+            else:
+                ydl_opts["cookiesfrombrowser"] = ("all",)
 
         if is_audio:
             ydl_opts["format"] = "bestaudio/best"
