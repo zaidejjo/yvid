@@ -1,9 +1,10 @@
 """
 YVid — package ``__main__`` launcher.
 
-Run ``python -m yvid`` to launch the GUI.
+Run ``python -m yvid`` to launch the Terminal CLI.
+Run ``yvid-gui`` to launch the Desktop GUI.
 """
 
-from .app import main
+from .cli import main as cli_main
 
-main()
+cli_main()
