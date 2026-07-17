@@ -3,7 +3,7 @@ name = "yvid"
 version = "1.0.0"
 description = "Modern Video Downloader — Desktop GUI + Terminal CLI"
 requires-python = ">=3.10"
-license = "MIT"
+license = {text = "MIT"}
 authors = [
     {name = "Zaid Ajo", email = "zaidejjodev@gmail.com"},
 ]
@@ -13,7 +13,6 @@ dependencies = [
     "Pillow>=9.0.0",
     "rich>=13.0.0",
     "questionary>=2.0.0",
-    "colorama>=0.4.6",
 ]
 
 [project.urls]
@@ -22,16 +21,19 @@ repository = "https://github.com/zaidejjo/yvid"
 bugs = "https://github.com/zaidejjo/yvid/issues"
 
 [project.scripts]
-yvid = "yvid.cli:main"
-yvid-cli = "yvid.cli:main"
-yvid-gui = "yvid.app:main"
+yvid = "cli:main"
+yvid-cli = "cli:main"
+yvid-gui = "app:main"
 
 [build-system]
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+py-modules = ["app", "cli"]
+
 [tool.setuptools.packages.find]
-include = ["yvid*"]
+include = ["core"]
 
 # ═══════════════════════════════════════════════════════════
 #  BeeWare Briefcase  —  cross-platform native packaging
@@ -68,14 +70,13 @@ Features include format selection, subtitle downloading, and video trimming.
 Available as both a desktop GUI application and a feature-rich terminal CLI.
 """
 icon = "assets/logo"
-sources = ["yvid"]
+sources = ["app.py", "cli.py", "core", "__main__.py"]
 requires = [
     "customtkinter>=5.2.2",
     "yt-dlp>=2025.0.0",
     "Pillow>=9.0.0",
     "rich>=13.0.0",
     "questionary>=2.0.0",
-    "colorama>=0.4.6",
 ]
 console_app = false
 

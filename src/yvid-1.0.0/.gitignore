@@ -2,16 +2,7 @@
 __pycache__/
 *.pyc
 *.pyo
-# Build
-dist/
 *.egg-info/
-build/
-pkg/
-*.tar.gz
-*.pkg.tar.zst
-.PKGINFO
-.BUILDINFO
-.MTREE
 .venv/
 .ruff_cache/
 

@@ -1,0 +1,175 @@
+---
+// 1-Click Install section with interactive terminal command
+---
+
+<section id="install" class="section-padding relative overflow-hidden">
+  <!-- Background glow -->
+  <div
+    aria-hidden="true"
+    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] opacity-[0.08] pointer-events-none"
+    style="
+      background: radial-gradient(ellipse, rgba(59,130,246,0.4) 0%, transparent 70%);
+    "
+  ></div>
+
+  <div class="section-container relative z-10">
+    <!-- Section header -->
+    <div class="text-center max-w-2xl mx-auto mb-16">
+      <span
+        class="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs font-medium text-yvid-300 mb-6"
+      >
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+          <polyline points="17 6 23 6 23 12"/>
+        </svg>
+        Smart Installation
+      </span>
+      <h2
+        class="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-balance"
+      >
+        1-Click Install —{" "}
+        <span class="gradient-text">zero configuration</span>
+      </h2>
+      <p class="mt-4 text-lg text-white/50 max-w-lg mx-auto">
+        One command to detect your OS and architecture, download the latest
+        release, and install YVid. Works on macOS, Linux, and Windows.
+      </p>
+    </div>
+
+    <!-- Terminal Card -->
+    <div
+      class="max-w-2xl mx-auto glass-strong rounded-2xl overflow-hidden
+             shadow-[0_0_40px_-8px_rgba(59,130,246,0.12)]
+             hover:shadow-[0_0_60px_-8px_rgba(59,130,246,0.2)]
+             transition-shadow duration-500"
+    >
+      <!-- Terminal Title Bar -->
+      <div class="flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-400/60"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-yellow-400/60"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-green-400/60"></span>
+          <span class="ml-2 text-xs text-white/30 font-mono">zsh — 80×24</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span
+            class="text-[10px] font-mono text-green-400/60 bg-green-400/5 px-2 py-0.5 rounded flex items-center gap-1"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+            Auto-detect
+          </span>
+        </div>
+      </div>
+
+      <!-- Terminal Body -->
+      <div class="px-5 py-5 font-mono text-sm leading-relaxed bg-[#060A14]">
+        <!-- Prompt line -->
+        <div class="flex items-start gap-3">
+          <span class="text-green-400/70 shrink-0 select-none">$</span>
+          <div class="flex-1 min-w-0">
+            <code
+              id="install-command"
+              class="text-white/80 break-all"
+            >
+              curl -fsSL <span class="text-cyan-400">https://yvid.pages.dev/install.sh</span> | sh
+            </code>
+            <span class="terminal-cursor"></span>
+          </div>
+        </div>
+
+        <!-- Animated output lines (simulated) -->
+        <div class="mt-4 space-y-1.5 text-white/40 text-xs">
+          <span class="block">
+            <span class="text-cyan-400/60">✦</span> Detecting OS...
+            <span class="text-green-400/60">macOS 14.5 (arm64)</span>
+          </span>
+          <span class="block">
+            <span class="text-cyan-400/60">✦</span> Fetching latest release...
+            <span class="text-green-400/60">v2.0.0</span>
+          </span>
+          <span class="block">
+            <span class="text-cyan-400/60">✦</span> Downloading YVid binary...
+            <span class="text-white/30">██████████████</span>
+            <span class="text-green-400/60">100%</span>
+          </span>
+          <span class="block text-green-400/70">
+            <span class="text-green-400">✔</span> Installed to
+            <span class="text-cyan-400/70">/usr/local/bin/yvid</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Copy Button Footer -->
+      <div class="flex items-center justify-between px-5 py-3 border-t border-white/[0.06] bg-white/[0.02]">
+        <span class="text-xs text-white/30">
+          <span class="text-cyan-400/60">⬇</span> Detects:
+          linux/macos/windows · amd64/arm64
+        </span>
+        <button
+          id="copy-btn"
+          class="flex items-center gap-1.5 text-xs font-medium text-white/50 hover:text-white
+                 px-3 py-1.5 rounded-lg hover:bg-white/[0.06] transition-all duration-200
+                 active:scale-95"
+          data-command="curl -fsSL https://yvid.pages.dev/install.sh | sh"
+        >
+          <svg
+            id="copy-icon"
+            width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          <span id="copy-text">Copy Command</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Compatible badges -->
+    <div class="flex flex-wrap items-center justify-center gap-2 mt-8">
+      <span class="text-xs px-3 py-1.5 rounded-full glass text-white/50">🍎 macOS (Intel & Apple Silicon)</span>
+      <span class="text-xs px-3 py-1.5 rounded-full glass text-white/50">🐧 Linux (deb/rpm/arch)</span>
+      <span class="text-xs px-3 py-1.5 rounded-full glass text-white/50">🪟 Windows (exe/msi)</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  const copyBtn = document.getElementById("copy-btn");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      const command = copyBtn.dataset.command;
+      try {
+        await navigator.clipboard.writeText(command);
+        const icon = document.getElementById("copy-icon");
+        const text = document.getElementById("copy-text");
+        if (icon && text) {
+          icon.innerHTML = `
+            <polyline points="20 6 9 17 4 12"/>
+          `;
+          text.textContent = "Copied!";
+          setTimeout(() => {
+            icon.innerHTML = `
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            `;
+            text.textContent = "Copy Command";
+          }, 2000);
+        }
+      } catch {
+        // Fallback for older browsers
+        const textarea = document.createElement("textarea");
+        textarea.value = command;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+    });
+  }
+</script>

@@ -4,14 +4,14 @@ Shared YVid configuration — constants, format maps, error patterns.
 
 from __future__ import annotations
 
-from pathlib import Path
+import os
 
 # ── Application metadata ────────────────────────────────────
 
 APP_NAME = "YVid"
 CLI_APP_NAME = "YVid-CLI"
 VERSION = "1.0.0"
-DEFAULT_OUTPUT_DIR = str(Path.home() / "Videos" / "YVid")
+DEFAULT_OUTPUT_DIR = os.path.expanduser("~/Videos/YVid")
 
 # ── Video quality → yt-dlp format string ────────────────────
 

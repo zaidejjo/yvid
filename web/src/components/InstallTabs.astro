@@ -1,0 +1,338 @@
+---
+// Alternative Installation Options — clean tab/toggle component
+---
+
+<section class="section-padding !pt-0 relative">
+  <!-- Gradient divider -->
+  <div class="gradient-divider mb-20"></div>
+
+  <div class="section-container">
+    <div class="text-center max-w-2xl mx-auto mb-12">
+      <h2
+        class="text-3xl sm:text-4xl font-bold tracking-tight text-balance"
+      >
+        Alternative <span class="gradient-text">Installation</span> Methods
+      </h2>
+      <p class="mt-4 text-lg text-white/50">
+        Choose your preferred package manager or download the standalone
+        binaries.
+      </p>
+    </div>
+
+    <!-- Tabs Container -->
+    <div
+      class="max-w-3xl mx-auto glass-strong rounded-2xl overflow-hidden"
+      id="install-tabs-container"
+    >
+      <!-- Tab Headers -->
+      <div
+        class="flex overflow-x-auto border-b border-white/[0.06] bg-white/[0.02] scrollbar-none"
+      >
+        <button
+          class="tab-btn flex items-center gap-2 px-5 py-4 text-sm font-medium whitespace-nowrap transition-all duration-200 border-b-2 border-transparent -mb-px text-white/50 hover:text-white/80"
+          data-tab="aur"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          Arch Linux (AUR)
+        </button>
+        <button
+          class="tab-btn flex items-center gap-2 px-5 py-4 text-sm font-medium whitespace-nowrap transition-all duration-200 border-b-2 border-transparent -mb-px text-white/50 hover:text-white/80"
+          data-tab="uv"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3h.01"/>
+            <path d="M12 21h.01"/>
+            <path d="M12 12h.01"/>
+            <path d="M3 12h.01"/>
+            <path d="M21 12h.01"/>
+            <path d="M12 3v.01"/>
+            <path d="M12 21v.01"/>
+            <path d="M12 12v.01"/>
+            <path d="M3 12v.01"/>
+            <path d="M21 12v.01"/>
+          </svg>
+          UV (Python)
+        </button>
+        <button
+          class="tab-btn flex items-center gap-2 px-5 py-4 text-sm font-medium whitespace-nowrap transition-all duration-200 border-b-2 border-transparent -mb-px text-white/50 hover:text-white/80"
+          data-tab="pip"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          PIP (Standard)
+        </button>
+        <button
+          class="tab-btn flex items-center gap-2 px-5 py-4 text-sm font-medium whitespace-nowrap transition-all duration-200 border-b-2 border-transparent -mb-px text-white/50 hover:text-white/80"
+          data-tab="binary"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          Standalone Binaries
+        </button>
+      </div>
+
+      <!-- Tab Content: AUR -->
+      <div class="tab-content p-6 md:p-8" data-tab="aur">
+        <div class="flex items-start gap-4">
+          <div
+            class="w-12 h-12 rounded-xl glass shrink-0 flex items-center justify-center"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-cyan-400">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-lg font-semibold text-white mb-1">Arch Linux (AUR)</h3>
+            <p class="text-sm text-white/50 mb-4">
+              YVid is available in the Arch User Repository. Use your favorite
+              AUR helper to install the latest git build.
+            </p>
+            <div
+              class="glass rounded-xl px-4 py-3 font-mono text-sm flex items-center justify-between gap-4"
+            >
+              <code class="text-white/80">yay -S yvid-git</code>
+              <button
+                class="copy-mini flex items-center gap-1 text-xs text-white/40 hover:text-cyan-400 transition-colors shrink-0"
+                data-command="yay -S yvid-git"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: UV -->
+      <div class="tab-content p-6 md:p-8 hidden" data-tab="uv">
+        <div class="flex items-start gap-4">
+          <div
+            class="w-12 h-12 rounded-xl glass shrink-0 flex items-center justify-center"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-cyan-400">
+              <path d="M12 3h.01"/>
+              <path d="M12 21h.01"/>
+              <path d="M12 12h.01"/>
+              <path d="M3 12h.01"/>
+              <path d="M21 12h.01"/>
+              <path d="M12 3v.01"/>
+              <path d="M12 21v.01"/>
+              <path d="M12 12v.01"/>
+              <path d="M3 12v.01"/>
+              <path d="M21 12v.01"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-lg font-semibold text-white mb-1">UV (Python Package Manager)</h3>
+            <p class="text-sm text-white/50 mb-4">
+              Install YVid globally using UV — the fast Python package and
+              project manager written in Rust.
+            </p>
+            <div
+              class="glass rounded-xl px-4 py-3 font-mono text-sm flex items-center justify-between gap-4"
+            >
+              <code class="text-white/80">uv tool install yvid</code>
+              <button
+                class="copy-mini flex items-center gap-1 text-xs text-white/40 hover:text-cyan-400 transition-colors shrink-0"
+                data-command="uv tool install yvid"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: PIP -->
+      <div class="tab-content p-6 md:p-8 hidden" data-tab="pip">
+        <div class="flex items-start gap-4">
+          <div
+            class="w-12 h-12 rounded-xl glass shrink-0 flex items-center justify-center"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-cyan-400">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-lg font-semibold text-white mb-1">PIP (Standard Python)</h3>
+            <p class="text-sm text-white/50 mb-4">
+              If you have Python 3.10+ installed, you can install YVid from
+              PyPI using the standard pip package manager.
+            </p>
+            <div
+              class="glass rounded-xl px-4 py-3 font-mono text-sm flex items-center justify-between gap-4"
+            >
+              <code class="text-white/80">pip install yvid</code>
+              <button
+                class="copy-mini flex items-center gap-1 text-xs text-white/40 hover:text-cyan-400 transition-colors shrink-0"
+                data-command="pip install yvid"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content: Standalone Binaries -->
+      <div class="tab-content p-6 md:p-8 hidden" data-tab="binary">
+        <div class="flex items-start gap-4">
+          <div
+            class="w-12 h-12 rounded-xl glass shrink-0 flex items-center justify-center"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-cyan-400">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-lg font-semibold text-white mb-1">Standalone Binaries</h3>
+            <p class="text-sm text-white/50 mb-4">
+              Download the pre-built binary for your platform. No runtime
+              dependencies required.
+            </p>
+            <div class="grid sm:grid-cols-2 gap-3">
+              <a
+                href="#"
+                class="flex items-center gap-3 glass rounded-xl px-4 py-3 hover:bg-white/[0.08] transition-all duration-200 group"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-blue-400 shrink-0">
+                  <rect x="4" y="4" width="16" height="16" rx="2"/>
+                  <path d="M9 8h6"/>
+                  <path d="M9 12h6"/>
+                  <path d="M9 16h4"/>
+                </svg>
+                <div>
+                  <span class="text-sm font-medium text-white/80 group-hover:text-white transition-colors">Windows (.exe)</span>
+                  <span class="text-xs text-white/30 block">64-bit · Portable</span>
+                </div>
+              </a>
+              <a
+                href="#"
+                class="flex items-center gap-3 glass rounded-xl px-4 py-3 hover:bg-white/[0.08] transition-all duration-200 group"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-amber-400 shrink-0">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <div>
+                  <span class="text-sm font-medium text-white/80 group-hover:text-white transition-colors">Linux (.deb)</span>
+                  <span class="text-xs text-white/30 block">Debian/Ubuntu · amd64</span>
+                </div>
+              </a>
+              <a
+                href="#"
+                class="flex items-center gap-3 glass rounded-xl px-4 py-3 hover:bg-white/[0.08] transition-all duration-200 group"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-cyan-400 shrink-0">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M2 12h20"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                <div>
+                  <span class="text-sm font-medium text-white/80 group-hover:text-white transition-colors">Linux (.rpm)</span>
+                  <span class="text-xs text-white/30 block">Fedora/RHEL · amd64</span>
+                </div>
+              </a>
+              <a
+                href="#"
+                class="flex items-center gap-3 glass rounded-xl px-4 py-3 hover:bg-white/[0.08] transition-all duration-200 group"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-purple-400 shrink-0">
+                  <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 3-1-1.56-2.78-3-5-3-2.72 0-5 2.22-5 5.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06z"/>
+                </svg>
+                <div>
+                  <span class="text-sm font-medium text-white/80 group-hover:text-white transition-colors">macOS (.dmg)</span>
+                  <span class="text-xs text-white/30 block">Intel & Apple Silicon</span>
+                </div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Tab switching logic
+  const tabs = document.querySelectorAll(".tab-btn");
+  const contents = document.querySelectorAll(".tab-content");
+
+  function activateTab(tabId) {
+    // Update tab buttons
+    tabs.forEach((btn) => {
+      const isActive = btn.dataset.tab === tabId;
+      btn.classList.toggle("border-yvid-500", isActive);
+      btn.classList.toggle("border-transparent", !isActive);
+      btn.classList.toggle("text-white", isActive);
+      btn.classList.toggle("text-white/50", !isActive);
+      btn.classList.toggle("bg-white/[0.03]", isActive);
+    });
+
+    // Update content panels
+    contents.forEach((content) => {
+      const isActive = content.dataset.tab === tabId;
+      content.classList.toggle("hidden", !isActive);
+      content.classList.toggle("block", isActive);
+    });
+  }
+
+  // Set default active tab
+  activateTab("aur");
+
+  // Add click handlers
+  tabs.forEach((btn) => {
+    btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+  });
+
+  // Copy buttons for each tab command
+  document.querySelectorAll(".copy-mini").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const command = btn.dataset.command;
+      try {
+        await navigator.clipboard.writeText(command);
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Copied!
+        `;
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+        }, 2000);
+      } catch {
+        // Fallback
+        const textarea = document.createElement("textarea");
+        textarea.value = command;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+    });
+  });
+</script>
