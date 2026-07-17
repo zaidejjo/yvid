@@ -2,7 +2,7 @@ name: Publish to AUR
 
 on:
   release:
-    types: [published] # يعمل تلقائياً عند نشر Release جديد على GitHub
+    types: [published]
 
 jobs:
   aur:
@@ -15,7 +15,8 @@ jobs:
         uses: KSXGitHub/github-actions-deploy-aur@v3
         with:
           pkgname: yvid
+          pkgbuild: ./PKGBUILD
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_username: zaidejjo
           commit_email: zaidejjodev@gmail.com
-          update_terminator: true
+          updpkgsums: true
