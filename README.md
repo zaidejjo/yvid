@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="yvid/assets/light_logo.png">
-    <img src="yvid/assets/logo.png" width="140" alt="YVid">
+    <img src="https://github.com/zaidejjo/yvid/blob/main/assets/logo.png" width="140" alt="YVid">
   </picture>
 </p>
 
@@ -23,6 +23,7 @@
 
 YVid is a premium terminal video downloader built for speed and power-users. Wrapping `yt-dlp` with an interactive TUI, it turns noisy one-liners into a fluid, guided experience.
 
+<!--
 ### Key Features
 
 | | Feature | Description |
@@ -35,7 +36,7 @@ YVid is a premium terminal video downloader built for speed and power-users. Wra
 | ✂️ | **Zero-Re-Encoding Trim** | FFmpeg stream-copy for instant, lossless cutting |
 | 📦 | **Download Archive** | Never download the same video twice — automatic skip |
 | ⚙️ | **Persistent Config** | `~/.config/yvid/config.toml` — remembers your defaults |
-
+-->
 ### Quick Demo
 
 ```
