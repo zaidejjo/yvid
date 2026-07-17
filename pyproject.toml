@@ -52,7 +52,7 @@ include = ["yvid*"]
 [tool.briefcase]
 project_name = "YVid"
 bundle = "com.zaidejjo"
-version = "1.0.0"
+version = "1.1.0"
 url = "https://github.com/zaidejjo/yvid"
 license = "MIT"
 author = "Zaid Ajo"
