@@ -1,7 +1,7 @@
 # Maintainer: Zaid Ajo <zaidejjodev@gmail.com>
 
 pkgname=yvid
-pkgver=1.0.0
+pkgver=1.1.5
 pkgrel=1
 pkgdesc="Modern Video Downloader — interactive YouTube search, playlist downloads, smart resume, desktop notifications"
 arch=('any')
