@@ -16,27 +16,12 @@ DEFAULT_OUTPUT_DIR = str(Path.home() / "Videos" / "YVid")
 # ── Video quality → yt-dlp format string ────────────────────
 
 FORMAT_VIDEO_QUALITY: dict[str, str] = {
-    "Best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-    "2160p": (
-        "bestvideo[ext=mp4][height<=2160]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=2160]/best"
-    ),
-    "1080p": (
-        "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=1080]/best"
-    ),
-    "720p": (
-        "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=720]/best"
-    ),
-    "480p": (
-        "bestvideo[ext=mp4][height<=480]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=480]/best"
-    ),
-    "360p": (
-        "bestvideo[ext=mp4][height<=360]+bestaudio[ext=m4a]"
-        "/best[ext=mp4][height<=360]/best"
-    ),
+    "Best": "bestvideo+bestaudio/best",
+    "2160p": ("bestvideo[height<=2160]+bestaudio/best[height<=2160]/best"),
+    "1080p": ("bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"),
+    "720p": ("bestvideo[height<=720]+bestaudio/best[height<=720]/best"),
+    "480p": ("bestvideo[height<=480]+bestaudio/best[height<=480]/best"),
+    "360p": ("bestvideo[height<=360]+bestaudio/best[height<=360]/best"),
 }
 
 # ── Error patterns ──────────────────────────────────────────
@@ -57,6 +42,10 @@ ERROR_PATTERNS: list[tuple[str, str]] = [
         "Network error. Check your internet connection.",
     ),
     (r"SSL", "SSL connection error. Check your network or date settings."),
+    (
+        r"Requested format is not available",
+        "Requested format is not available for this video. Try a different quality or format.",
+    ),
     (r"No video formats found", "No available formats found for this video."),
     (r"unsupported url", "Unsupported URL. Please enter a valid video URL."),
 ]

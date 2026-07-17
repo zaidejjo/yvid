@@ -132,6 +132,7 @@ class TestFormatErrorMessage:
             ("ConnectionError", "Network error"),
             ("Cannot connect to host", "Network error"),
             ("SSL certificate verify failed", "SSL connection error"),
+            ("Requested format is not available", "Requested format is not available"),
             ("No video formats found", "No available formats"),
             ("unsupported url", "Unsupported URL"),
         ],
@@ -303,11 +304,12 @@ class TestFormatVideoQualityDict:
         for key, fmt in FORMAT_VIDEO_QUALITY.items():
             assert fmt.endswith("/best"), f"{key!r} does not end with /best"
 
-    def test_all_entries_contain_mp4(self) -> None:
+    def test_all_entries_use_compound_or_fallback(self) -> None:
         from yvid.core.config import FORMAT_VIDEO_QUALITY
 
         for key, fmt in FORMAT_VIDEO_QUALITY.items():
-            assert "mp4" in fmt, f"{key!r} does not reference mp4"
+            assert "+" in fmt, f"{key!r} does not contain a compound format (+)"
+            assert "/" in fmt, f"{key!r} does not contain a fallback (/)"
 
     def test_known_keys(self) -> None:
         from yvid.core.config import FORMAT_VIDEO_QUALITY

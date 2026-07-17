@@ -529,7 +529,7 @@ theme_color = "#007AFF"
         # ── Quality (video only) ────────────────────────────
         c["quality"] = "Best"
         qmap = {
-            "best": "Best Quality",
+            "best": "Best",
             "2160p": "2160p (4K)",
             "1080p": "1080p (Full HD)",
             "720p": "720p (HD)",
@@ -538,11 +538,11 @@ theme_color = "#007AFF"
         if not c["is_audio"]:
             quality_choices = list(qmap.values())
             if a.quality is not None:
-                c["quality"] = qmap.get(a.quality, "Best Quality")
+                c["quality"] = qmap.get(a.quality, "Best")
             else:
                 # Pre-select based on config default_quality
                 q_default = qmap.get(
-                    self.settings.get("default_quality", "best"), "Best Quality"
+                    self.settings.get("default_quality", "best"), "Best"
                 )
                 q = _ask(
                     "select",
@@ -569,7 +569,8 @@ theme_color = "#007AFF"
                 te = ""
             c["trim_start"] = ts if ts else None
             c["trim_end"] = te if te else None
-        else:
+        elif not self._all_flags_provided():
+            # Skip interactive prompt in direct-download mode (--url + --format + --quality)
             trim_label = "Trim audio?" if c["is_audio"] else "Trim video?"
             trim_q = _ask(
                 "confirm",
@@ -604,7 +605,8 @@ theme_color = "#007AFF"
         c["subs"] = False
         if a.subs:
             c["subs"] = True
-        elif not c["is_audio"]:
+        elif not c["is_audio"] and not self._all_flags_provided():
+            # Skip interactive prompt in direct-download mode (--url + --format + --quality)
             subs_q = _ask(
                 "confirm",
                 f"{_NF_B}  Embed subtitles (if available)?",
@@ -732,17 +734,20 @@ theme_color = "#007AFF"
             "download_archive": os.path.join(self._get_config_dir(), "archive.txt"),
         }
 
-        # ── Automatic cookies (frictionless bot bypass) ─────
+        # ── Cookies (opt-in only) ──────────────────────────
+        # Browser cookies can trigger YouTube's JS challenge system
+        # (n-challenge) which causes "format not available" errors on
+        # many videos.  Cookies are therefore opt-in: only used when
+        # explicitly requested via --cookies-from-browser or --cookies.
         if self.config.get("cookies_file"):
             ydl_opts["cookiefile"] = self.config["cookies_file"]
         elif self.config.get("cookies_from_browser"):
             ydl_opts["cookiesfrombrowser"] = (self.config["cookies_from_browser"],)
-        else:
-            working_browser = safe_extract_cookies_browser()
-            if working_browser:
-                ydl_opts["cookiesfrombrowser"] = (working_browser,)
-            else:
-                ydl_opts["cookiesfrombrowser"] = ("all",)
+        # NOTE: Do NOT auto-detect browser cookies.  Auto-detected cookies
+        # often trigger YouTube's JS challenge system, causing the
+        # "Requested format is not available" error even though the same
+        # URL works without cookies.  Omitting cookiesfrombrowser means
+        # yt-dlp proceeds without browser cookies — the safe default.
 
         if is_audio:
             ydl_opts["format"] = "bestaudio/bestvideo+bestaudio/best"
@@ -1145,6 +1150,8 @@ theme_color = "#007AFF"
 
     def _ask_download_another(self) -> bool:
         """Prompt the user to download another video."""
+        if not sys.stdin.isatty():
+            return False
         again = _ask(
             "confirm",
             f"{_NF_D}  Download another video?",
@@ -1180,6 +1187,11 @@ theme_color = "#007AFF"
             if self._try_update_ytdlp():
                 return True
             # Update didn't help — fall through to the retry prompt
+
+        # Only prompt interactively when running in a real terminal;
+        # otherwise (piped input, CI, subprocess) do not retry.
+        if not sys.stdin.isatty():
+            return False
 
         choice = _ask("confirm", "Retry?", default=False).ask()
         return bool(choice)

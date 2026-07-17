@@ -37,11 +37,12 @@ YVid is a premium terminal video downloader built for speed and power-users. Wra
 | 📦 | **Download Archive** | Never download the same video twice — automatic skip |
 | ⚙️ | **Persistent Config** | `~/.config/yvid/config.toml` — remembers your defaults |
 -->
+
 ### Quick Demo
 
 ```
 $ yvid
-  YVid │ Video Downloader  v1.0.0
+  YVid │ Video Downloader
   ──────────────────────────────────────────
 
   ❯ 󰗀  Paste video URL or search:
@@ -106,15 +107,15 @@ yvid --url "search query"         # Interactive YouTube search
 
 **CLI Flags:**
 
-| Flag | Values | Description |
-|---|---|---|
-| `--url` | URL or search text | Video URL or search query |
-| `--format` | `mp4`, `mp3` | Output format |
-| `--quality` | `best`, `2160p`, `1080p`, `720p`, `480p` | Video resolution |
-| `--trim-start` | `HH:MM:SS` | Trim start time |
-| `--trim-end` | `HH:MM:SS` | Trim end time |
-| `--subs` | flag | Embed subtitles when available |
-| `--output` | path | Output directory |
+| Flag           | Values                                   | Description                    |
+| -------------- | ---------------------------------------- | ------------------------------ |
+| `--url`        | URL or search text                       | Video URL or search query      |
+| `--format`     | `mp4`, `mp3`                             | Output format                  |
+| `--quality`    | `best`, `2160p`, `1080p`, `720p`, `480p` | Video resolution               |
+| `--trim-start` | `HH:MM:SS`                               | Trim start time                |
+| `--trim-end`   | `HH:MM:SS`                               | Trim end time                  |
+| `--subs`       | flag                                     | Embed subtitles when available |
+| `--output`     | path                                     | Output directory               |
 
 ### GUI Option
 
@@ -126,12 +127,12 @@ yvid-gui
 
 ### Cross-Platform
 
-| Platform | Status | Notes |
-|---|---|---|
-| Linux (Arch, Debian, Fedora) | ✅ | Native `notify-send` support |
-| macOS | ✅ | Native `osascript` notification banners |
-| Windows | ✅ | PowerShell Toast notifications, ANSI via `colorama` |
-| Nerd Fonts | ✅ | Auto-detected; falls back to universal Unicode |
+| Platform                     | Status | Notes                                               |
+| ---------------------------- | ------ | --------------------------------------------------- |
+| Linux (Arch, Debian, Fedora) | ✅     | Native `notify-send` support                        |
+| macOS                        | ✅     | Native `osascript` notification banners             |
+| Windows                      | ✅     | PowerShell Toast notifications, ANSI via `colorama` |
+| Nerd Fonts                   | ✅     | Auto-detected; falls back to universal Unicode      |
 
 ### License
 

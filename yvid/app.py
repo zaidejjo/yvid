@@ -1005,12 +1005,12 @@ class App(ctk.CTk):
             "ignore_errors": False,
         }
 
-        # ── Automatic cookies (frictionless bot bypass) ─────
-        working_browser = safe_extract_cookies_browser()
-        if working_browser:
-            ydl_opts["cookiesfrombrowser"] = (working_browser,)
-        else:
-            ydl_opts["cookiesfrombrowser"] = ("all",)
+        # ── Cookies (opt-in only) ──────────────────────────
+        # Browser cookies can trigger YouTube's JS challenge system
+        # which causes "format not available" errors on many videos.
+        # Cookies are opt-in: only used when explicitly requested.
+        # NOTE: Do NOT auto-detect browser cookies here — let the caller
+        # (GUI settings) pass them if desired.
 
         if is_audio:
             ydl_opts["format"] = "bestaudio/bestvideo+bestaudio/best"

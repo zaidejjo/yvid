@@ -62,31 +62,26 @@ class TestFormatMapping:
     @pytest.mark.parametrize(
         "key, expected",
         [
-            ("Best", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"),
+            ("Best", "bestvideo+bestaudio/best"),
             (
                 "2160p",
-                "bestvideo[ext=mp4][height<=2160]+bestaudio[ext=m4a]"
-                "/best[ext=mp4][height<=2160]/best",
+                "bestvideo[height<=2160]+bestaudio/best[height<=2160]/best",
             ),
             (
                 "1080p",
-                "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]"
-                "/best[ext=mp4][height<=1080]/best",
+                "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
             ),
             (
                 "720p",
-                "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]"
-                "/best[ext=mp4][height<=720]/best",
+                "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
             ),
             (
                 "480p",
-                "bestvideo[ext=mp4][height<=480]+bestaudio[ext=m4a]"
-                "/best[ext=mp4][height<=480]/best",
+                "bestvideo[height<=480]+bestaudio/best[height<=480]/best",
             ),
             (
                 "360p",
-                "bestvideo[ext=mp4][height<=360]+bestaudio[ext=m4a]"
-                "/best[ext=mp4][height<=360]/best",
+                "bestvideo[height<=360]+bestaudio/best[height<=360]/best",
             ),
         ],
     )
@@ -124,7 +119,7 @@ class TestBuildYdlOptsFormat:
     @pytest.mark.parametrize(
         "quality_label, expected_key",
         [
-            ("Best Quality", "Best"),
+            ("Best", "Best"),
             ("2160p (4K)", "2160p"),
             ("1080p (Full HD)", "1080p"),
             ("720p (HD)", "720p"),
@@ -231,9 +226,9 @@ class TestCookieInYdlOpts:
         opts = cli._build_ydl_opts("/tmp")
         assert opts["cookiesfrombrowser"] == ("firefox",)
 
-    def test_both_cookies_empty_falls_back_to_safe_extraction(self) -> None:
-        """When neither cookie option is set, ``cookiesfrombrowser`` must
-        still be present (the safe-extraction fallback path ensures this).
+    def test_both_cookies_empty_no_auto_detection(self) -> None:
+        """When no cookie option is set, no cookies options must appear
+        in ydl_opts — cookies are opt-in only (no auto-detection).
         """
         cli = _make_cli()
         cli.config = {
@@ -243,12 +238,12 @@ class TestCookieInYdlOpts:
             "cookies_file": "",
             "cookies_from_browser": "",
         }
-        opts = cli._build_ydl_opts("/tmp")
-        # The fallback always produces a tuple — either (working_browser,) or ("all",)
-        assert "cookiesfrombrowser" in opts
-        assert isinstance(opts["cookiesfrombrowser"], tuple)
-        assert len(opts["cookiesfrombrowser"]) == 1
-        assert isinstance(opts["cookiesfrombrowser"][0], str)
+        # safe_extract_cookies_browser should NOT be called at all
+        with patch("yvid.cli.safe_extract_cookies_browser") as mock_extract:
+            opts = cli._build_ydl_opts("/tmp")
+        assert "cookiesfrombrowser" not in opts
+        assert "cookiefile" not in opts
+        mock_extract.assert_not_called()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -268,9 +263,10 @@ class TestErrorHandling:
         # Mock the interactive prompt and update attempt so the test
         # doesn't try to read from stdin or run pip.
         with patch.object(cli, "_try_update_ytdlp", return_value=False):
-            with patch("yvid.cli._ask") as mock_ask:
-                mock_ask.return_value.ask.return_value = False
-                result = cli._handle_download_error(exc)
+            with patch("sys.stdin.isatty", return_value=True):
+                with patch("yvid.cli._ask") as mock_ask:
+                    mock_ask.return_value.ask.return_value = False
+                    result = cli._handle_download_error(exc)
         assert isinstance(result, bool)
 
     def test_textiowrapper_not_leaked(self) -> None:
@@ -283,9 +279,10 @@ class TestErrorHandling:
             "<_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>"
         )
         with patch.object(cli, "_try_update_ytdlp", return_value=False):
-            with patch("yvid.cli._ask") as mock_ask:
-                mock_ask.return_value.ask.return_value = False
-                result = cli._handle_download_error(exc)
+            with patch("sys.stdin.isatty", return_value=True):
+                with patch("yvid.cli._ask") as mock_ask:
+                    mock_ask.return_value.ask.return_value = False
+                    result = cli._handle_download_error(exc)
         assert isinstance(result, bool)
 
     @pytest.mark.parametrize(
@@ -305,10 +302,24 @@ class TestErrorHandling:
 
         exc = DownloadError(error_message)
         with patch.object(cli, "_try_update_ytdlp", return_value=False):
-            with patch("yvid.cli._ask") as mock_ask:
-                mock_ask.return_value.ask.return_value = False
-                result = cli._handle_download_error(exc)
+            with patch("sys.stdin.isatty", return_value=True):
+                with patch("yvid.cli._ask") as mock_ask:
+                    mock_ask.return_value.ask.return_value = False
+                    result = cli._handle_download_error(exc)
         assert isinstance(result, bool)
+
+    def test_non_tty_returns_false_without_prompt(self) -> None:
+        """When stdin is not a TTY, the error handler must return False
+        without attempting an interactive prompt."""
+        cli = _make_cli()
+        exc = DownloadError("Some random error")
+
+        with patch("sys.stdin.isatty", return_value=False):
+            with patch("yvid.cli._ask") as mock_ask:
+                result = cli._handle_download_error(exc)
+        # No _ask was called
+        mock_ask.assert_not_called()
+        assert result is False
 
     def test_main_loop_catches_download_error(self) -> None:
         """The main ``run()`` loop catches ``DownloadError`` and does not
@@ -416,23 +427,17 @@ class TestEdgeCases:
     def test_interactive_flow_wires_cookies_from_cli_args(self) -> None:
         """When --cookies-from-browser is passed, _interactive_flow must
         store it in config."""
-        # Provide URL + format + quality so several prompts are skipped,
-        # but trim and subs still ask interactively — mock those.
+        # Provide URL + format + quality so all prompts are skipped in
+        # direct-download mode except the output directory.
+        # Mock _get_output_dir only.
         cli = _make_cli(
             cookies_from_browser="firefox",
             url="https://youtube.com/watch?v=test123",
             format="mp4",
             quality="best",
         )
-        # The interactive flow hits: trim confirm, subs confirm, and output-dir
-        # prompt.  Mock _ask (which questionary wraps) and _get_output_dir.
-        with patch("yvid.cli._ask") as mock_ask:
-            mock_ask.return_value.ask.side_effect = [
-                False,  # trim: no
-                False,  # subs: no
-            ]
-            with patch.object(cli, "_get_output_dir", return_value="/tmp"):
-                cli._interactive_flow()
+        with patch.object(cli, "_get_output_dir", return_value="/tmp"):
+            cli._interactive_flow()
         assert cli.config.get("cookies_from_browser") == "firefox"
 
     def test_download_single_none_on_error(self) -> None:
@@ -450,6 +455,9 @@ class TestEdgeCases:
             "trim_start": None,
             "trim_end": None,
         }
-        result = cli._download_single()
+        # Mock safe_extract_cookies_browser so the test doesn't depend
+        # on (or block waiting for) real browser cookie databases.
+        with patch("yvid.cli.safe_extract_cookies_browser", return_value=None):
+            result = cli._download_single()
         assert result is None
         assert cli._last_error != ""
