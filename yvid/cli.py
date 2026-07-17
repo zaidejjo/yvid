@@ -195,6 +195,44 @@ default_quality = "best"
 theme_color = "#007AFF"
 """
 
+    def _save_output_dir(self, output_dir: str) -> None:
+        """Persist the last-used output directory to ``config.toml`` so
+        the next session remembers it."""
+        config_dir = self._get_config_dir()
+        config_path = os.path.join(config_dir, "config.toml")
+        if not os.path.isfile(config_path):
+            return
+
+        try:
+            with open(config_path) as f:
+                lines = f.readlines()
+        except Exception:
+            return
+
+        import re
+
+        new_lines: list[str] = []
+        found = False
+        for line in lines:
+            if re.match(r"^\s*output_dir\s*=", line):
+                new_lines.append(f'output_dir = "{output_dir}"\n')
+                found = True
+            else:
+                new_lines.append(line)
+
+        if not found:
+            # No output_dir line — add it under the [defaults] section
+            new_lines.append(f'[defaults]\noutput_dir = "{output_dir}"\n')
+
+        try:
+            with open(config_path, "w") as f:
+                f.writelines(new_lines)
+        except Exception:
+            return
+
+        # Update in-memory settings too
+        self.settings["output_dir"] = os.path.expanduser(output_dir)
+
     def _init_config(self) -> None:
         """Ensure config dir + default file exist, then load settings."""
         config_dir = self._get_config_dir()
@@ -354,7 +392,6 @@ theme_color = "#007AFF"
             (" │ ", "dim"),
             ("Video Downloader", "cyan"),
             ("  ", ""),
-            (f"v{VERSION}", "dim"),
         )
         self.console.print(title)
         self.console.print("[dim]\u2500" * 42 + "[/dim]")
@@ -792,6 +829,11 @@ theme_color = "#007AFF"
             if path is None:
                 raise DownloadError(self._last_error or "Download failed")
             self.last_output_path = path
+
+        # Remember the output directory for next session
+        output_dir = self.config.get("output_dir", "")
+        if output_dir:
+            self._save_output_dir(output_dir)
 
     # ── single-video download ───────────────────────────
 
