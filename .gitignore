@@ -1,26 +1,43 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-# Build
-dist/
-*.egg-info/
-build/
-pkg/
-*.tar.gz
-*.pkg.tar.zst
-.PKGINFO
-.BUILDINFO
-.MTREE
-.venv/
-.ruff_cache/
+# ── Go ─────────────────────────────────────────────────────────
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
 
-# OS
+# ── Python (yvid-python/) ────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+*.egg
+.pytest_cache/
+.ruff_cache/
+.tox/
+.mypy_cache/
+*.pyc
+
+# ── IDE / Editor ──────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
 
-# IDE
-.vscode/
-.idea/
+# ── OS ────────────────────────────────────────────────────────
 .env
-*.env
+*.env.local
+
+# ── Misc ──────────────────────────────────────────────────────
+*.log
+*.tmp
+dist/
+node_modules/
