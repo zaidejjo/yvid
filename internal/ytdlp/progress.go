@@ -18,9 +18,17 @@ type progressJSON struct {
 
 // parseProgressLine attempts to parse a JSON progress line from yt-dlp.
 func parseProgressLine(line string) ProgressEvent {
-	// Try JSON first
+	// yt-dlp --progress-template "json:..." outputs lines like:
+	//   json:{"status":"downloading","percent":"45.2",...}
+	// Strip the "json:" prefix if present.
+	raw := line
+	if strings.HasPrefix(raw, "json:") {
+		raw = raw[5:]
+	}
+
+	// Try JSON
 	var pj progressJSON
-	if err := json.Unmarshal([]byte(line), &pj); err == nil && pj.Status != "" {
+	if err := json.Unmarshal([]byte(raw), &pj); err == nil && pj.Status != "" {
 		return progressFromJSON(pj)
 	}
 
@@ -42,48 +50,63 @@ func parseProgressLine(line string) ProgressEvent {
 }
 
 func progressFromJSON(pj progressJSON) ProgressEvent {
-	evt := ProgressEvent{Status: pj.Status}
-
-	if pj.Percent != "" && pj.Percent != "N/A" {
-		v, err := strconv.ParseFloat(strings.TrimSuffix(pj.Percent, "%"), 64)
-		if err == nil {
-			evt.Percent = v
-		}
+	evt := ProgressEvent{
+		Status: pj.Status,
 	}
 
-	if pj.Speed != "" && pj.Speed != "N/A" {
-		v, err := strconv.ParseFloat(pj.Speed, 64)
-		if err == nil {
-			evt.Speed = v
-		}
+	if v := parseNAFloat(pj.Percent); v >= 0 {
+		evt.Percent = v
 	}
 
-	if pj.ETA != "" && pj.ETA != "N/A" {
-		v, err := strconv.ParseFloat(pj.ETA, 64)
-		if err == nil {
-			evt.ETA = v
-		}
+	if v := parseNAFloat(pj.Speed); v >= 0 {
+		evt.Speed = v
 	}
 
-	if pj.Downloaded != "" && pj.Downloaded != "N/A" {
-		v, err := strconv.ParseInt(pj.Downloaded, 10, 64)
-		if err == nil {
-			evt.Downloaded = v
-		}
+	if v := parseNAFloat(pj.ETA); v >= 0 {
+		evt.ETA = v
 	}
 
-	if pj.Total != "" && pj.Total != "N/A" {
-		v, err := strconv.ParseInt(pj.Total, 10, 64)
-		if err == nil {
-			evt.Total = v
-		}
+	if v := parseNAInt(pj.Downloaded); v >= 0 {
+		evt.Downloaded = v
+	}
+
+	if v := parseNAInt(pj.Total); v >= 0 {
+		evt.Total = v
 	}
 
 	return evt
 }
 
+// parseNAFloat parses a float from a yt-dlp field that may be "NA".
+// Returns -1 if the value is NA or unparseable.
+func parseNAFloat(s string) float64 {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "NA" || s == "N/A" || s == "n/a" {
+		return -1
+	}
+	s = strings.TrimSuffix(s, "%")
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return -1
+	}
+	return v
+}
+
+// parseNAInt parses an int from a yt-dlp field that may be "NA".
+// Returns -1 if the value is NA or unparseable.
+func parseNAInt(s string) int64 {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "NA" || s == "N/A" || s == "n/a" {
+		return -1
+	}
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return -1
+	}
+	return v
+}
+
 func extractErrorMessage(line string) string {
-	// "ERROR: something went wrong"
 	idx := strings.Index(line, "ERROR:")
 	if idx >= 0 {
 		return strings.TrimSpace(line[idx+6:])

@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/zaidejjo/yvid/internal/ytdlp"
 )
 
 // viewInput renders the URL/search input screen.
@@ -15,7 +17,7 @@ func (m Model) viewInput() string {
 
 	// Mode label
 	var modeLabel string
-	if m.inputMode {
+	if m.inputMode == InputURL {
 		modeLabel = LabelStyle.Render("URL:")
 	} else {
 		modeLabel = LabelStyle.Render("Search:")
@@ -50,7 +52,7 @@ func (m Model) viewResults() string {
 
 	for i, r := range m.searchResults {
 		line := fmt.Sprintf(" %s  %s  %s  %s",
-			r.Duration,
+			ytdlp.DurationStr(r.Duration),
 			r.Title,
 			r.Uploader,
 			r.URL,

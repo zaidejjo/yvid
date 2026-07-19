@@ -9,17 +9,114 @@ import (
 	"github.com/zaidejjo/yvid/internal/ytdlp"
 )
 
-// Run starts the interactive TUI for downloading a URL.
-// If url is empty, starts at the input screen.
-// If url is provided, starts at the format picker.
+// ── Message types ──────────────────────────────────────────────
+
+// metadataMsg is sent when video metadata is fetched.
+type metadataMsg struct {
+	meta *ytdlp.VideoMetadata
+}
+
+// searchResultsMsg is sent when search results are fetched.
+type searchResultsMsg struct {
+	results []ytdlp.SearchResultItem
+}
+
+// errMsg is sent when an operation fails.
+type errMsg struct {
+	err error
+}
+
+// progressMsg wraps a yt-dlp progress event for the TUI.
+type progressMsg struct {
+	ytdlp.ProgressEvent
+}
+
+// downloadStartedMsg signals that download has begun.
+type downloadStartedMsg struct{}
+
+// downloadCompleteMsg signals that download finished successfully.
+type downloadCompleteMsg struct {
+	outputPath string
+}
+
+// ── Command constructors ───────────────────────────────────────
+
+// fetchMetadataCmd spawns yt-dlp --dump-json for a given URL.
+func fetchMetadataCmd(ctx context.Context, url string) tea.Cmd {
+	return func() tea.Msg {
+		dl := ytdlp.NewDownloader()
+		meta, err := dl.FetchMetadata(ctx, url)
+		if err != nil {
+			return errMsg{err}
+		}
+		return metadataMsg{meta}
+	}
+}
+
+// searchCmd spawns yt-dlp ytsearch5: for a query.
+func searchCmd(ctx context.Context, query string) tea.Cmd {
+	return func() tea.Msg {
+		dl := ytdlp.NewDownloader()
+		results, err := dl.Search(ctx, query)
+		if err != nil {
+			return errMsg{err}
+		}
+		return searchResultsMsg{results}
+	}
+}
+
+// startDownloadCmd spawns yt-dlp download and feeds progress events.
+func startDownloadCmd(ctx context.Context, opts ytdlp.Options, progressCh chan<- ytdlp.ProgressEvent) tea.Cmd {
+	return func() tea.Msg {
+		dl := ytdlp.NewDownloader()
+		ch, err := dl.Download(ctx, opts)
+		if err != nil {
+			return errMsg{err}
+		}
+
+		// Relay progress events to the provided channel
+		go func() {
+			defer close(progressCh)
+			for evt := range ch {
+				progressCh <- evt
+				if evt.Status == "completed" || evt.Status == "error" {
+					return
+				}
+			}
+		}()
+
+		return downloadStartedMsg{}
+	}
+}
+
+// waitForProgressCmd polls the progress channel and sends messages.
+func waitForProgressCmd(ch <-chan ytdlp.ProgressEvent) tea.Cmd {
+	return func() tea.Msg {
+		evt, ok := <-ch
+		if !ok {
+			return downloadCompleteMsg{}
+		}
+		if evt.Status == "completed" {
+			return downloadCompleteMsg{outputPath: evt.OutputPath}
+		}
+		if evt.Status == "error" {
+			return errMsg{fmt.Errorf(evt.Message)}
+		}
+		return progressMsg{evt}
+	}
+}
+
+// ── Run ────────────────────────────────────────────────────────
+
+// Run starts the interactive TUI.
 func Run(ctx context.Context, url string) error {
-	m := NewModel()
+	m := NewModel(ctx)
 
 	if url != "" {
 		m.input.SetValue(url)
 		m.query = url
-		m.detectInputMode()
-		// Will transition after tick
+		m.loading = true
+		m.loadingMsg = "Fetching video info..."
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -34,94 +131,5 @@ func Run(ctx context.Context, url string) error {
 		return final.err
 	}
 
-	// If a download was configured, launch it
-	if final.selectedFormat != "" && final.query != "" {
-		return startDownload(ctx, final)
-	}
-
 	return nil
-}
-
-// startDownload launches the yt-dlp subprocess and feeds progress to the TUI.
-func startDownload(ctx context.Context, m Model) error {
-	opts := ytdlp.Options{
-		URL:       m.query,
-		Format:    m.selectedFormat,
-		Quality:   m.selectedQuality,
-		Subtitles: m.selectedSubs,
-	}
-
-	dl := ytdlp.NewDownloader()
-	progressCh, err := dl.Download(ctx, opts)
-	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
-	}
-
-	// Create a progress-only TUI
-	progModel := progressModel{
-		ch: progressCh,
-	}
-	p := tea.NewProgram(progModel, tea.WithAltScreen())
-
-	_, err = p.Run()
-	return err
-}
-
-// progressModel is a simpler TUI for showing download progress.
-type progressModel struct {
-	ch      <-chan ytdlp.ProgressEvent
-	percent float64
-	speed   string
-	eta     string
-	done    bool
-	err     error
-}
-
-func (m progressModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m progressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
-			return m, tea.Quit
-		}
-
-	case ytdlp.ProgressEvent:
-		switch msg.Status {
-		case "downloading":
-			m.percent = msg.Percent
-			m.speed = msg.SpeedHuman()
-			m.eta = msg.ETAHuman()
-		case "completed":
-			m.done = true
-			return m, tea.Quit
-		case "error":
-			m.err = fmt.Errorf(msg.Message)
-			return m, tea.Quit
-		}
-	}
-
-	// Poll for progress
-	select {
-	case evt, ok := <-m.ch:
-		if !ok {
-			m.done = true
-			return m, tea.Quit
-		}
-		return m, func() tea.Msg { return evt }
-	default:
-		return m, nil
-	}
-}
-
-func (m progressModel) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("✘ Error: %s\n", m.err)
-	}
-	if m.done {
-		return "✓ Download complete!\n"
-	}
-	return fmt.Sprintf("Downloading... %.1f%%  %s/s  ETA: %s\n", m.percent, m.speed, m.eta)
 }

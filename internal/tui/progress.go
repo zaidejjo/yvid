@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -28,15 +27,11 @@ func (m Model) viewProgress() string {
 	}
 
 	// Progress bar
-	p := progress.New(
-		progress.WithDefaultGradient(),
-		progress.WithWidth(50),
-	)
-	p.SetPercent(m.progress.Percent / 100.0)
-	b.WriteString(p.View())
+	bar := m.progModel.ViewAs(m.progressBar)
+	b.WriteString(bar)
 	b.WriteString("\n")
 
-	// Stats
+	// Stats row
 	b.WriteString(fmt.Sprintf("\n  %s  %s/s  ETA: %s  %s / %s\n",
 		ProgressPercentStyle.Render(fmt.Sprintf("%.1f%%", m.progress.Percent)),
 		m.progress.Speed,
@@ -72,11 +67,7 @@ func (m Model) viewComplete() string {
 	))
 
 	b.WriteString("\n")
-	b.WriteString(HelpStyle.Render("Press any key to return  •  Ctrl+C to quit"))
-	b.WriteString("\n\n")
-
-	// Prompt for trim
-	b.WriteString("✂️  Trim video? (coming soon)")
+	b.WriteString(HelpStyle.Render("Press Enter for new download  •  Ctrl+C to quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
@@ -94,7 +85,7 @@ func (m Model) viewError() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(HelpStyle.Render("Press any key to return  •  Ctrl+C to quit"))
+	b.WriteString(HelpStyle.Render("Press R to retry  •  Ctrl+C to quit"))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }

@@ -2,17 +2,28 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/zaidejjo/yvid/internal/ytdlp"
 )
 
 // viewFormatPicker renders the format/quality selection screen.
 func (m Model) viewFormatPicker() string {
-	var b strings.Builder
+	b := lipgloss.NewStyle().Padding(1, 2)
 
-	b.WriteString(TitleStyle.Render("Select format and quality"))
-	b.WriteString("\n\n")
+	// Title
+	content := TitleStyle.Render("Select format and quality") + "\n\n"
+
+	// Video info (when metadata is available)
+	if m.meta != nil {
+		content += LabelStyle.Render("Title:") + " "
+		content += ValueStyle.Render(truncateStr(m.meta.Title, 60)) + "\n"
+		content += LabelStyle.Render("Uploader:") + " "
+		content += ValueStyle.Render(m.meta.Uploader) + "\n"
+		content += LabelStyle.Render("Duration:") + " "
+		content += ValueStyle.Render(ytdlp.DurationStr(m.meta.Duration)) + "\n"
+		content += "\n"
+	}
 
 	// Format options
 	for i, opt := range m.formatOptions {
@@ -29,26 +40,30 @@ func (m Model) viewFormatPicker() string {
 		line := fmt.Sprintf(" %s  %s", icon, opt.Label)
 
 		if i == m.formatCursor {
-			b.WriteString(ResultSelectedStyle.Render("▸ " + line))
+			content += ResultSelectedStyle.Render("▸ "+line) + "\n"
 		} else {
-			b.WriteString(ResultItemStyle.Render("  " + line))
+			content += ResultItemStyle.Render("  "+line) + "\n"
 		}
-		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
+	content += "\n"
 
 	// Subtitles toggle
 	subsStatus := "off"
 	if m.selectedSubs {
 		subsStatus = "on"
 	}
-	b.WriteString(fmt.Sprintf(" Subtitles: [%s]  (press s to toggle)\n", subsStatus))
+	content += fmt.Sprintf(" Subtitles: [%s]  (press s to toggle)\n", subsStatus)
 
-	b.WriteString("\n")
-	b.WriteString(Separator)
-	b.WriteString("\n")
-	b.WriteString(HelpStyle.Render("↑/↓ navigate  •  Enter download  •  s toggle subs  •  Ctrl+C quit"))
+	content += "\n" + Separator + "\n"
+	content += HelpStyle.Render("↑/↓ navigate  •  Enter download  •  s toggle subs  •  Ctrl+C quit")
 
-	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
+	return b.Render(content)
+}
+
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
