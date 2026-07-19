@@ -1,0 +1,103 @@
+# yvid — GoReleaser configuration
+#
+# Builds yvid for all platforms, creates archives with checksums,
+# and publishes to GitHub Releases on tag push.
+#
+# Usage:
+#   goreleaser release --clean        # dry-run
+#   goreleaser release                # publish (requires GITHUB_TOKEN)
+
+version: 2
+
+project_name: yvid
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: yvid
+    main: ./cmd/yvid
+    binary: yvid
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/zaidejjo/yvid/internal/cli.version={{ .Version }}
+      - -X github.com/zaidejjo/yvid/internal/cli.commit={{ .ShortCommit }}
+      - -X github.com/zaidejjo/yvid/internal/cli.date={{ .Date }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: binary
+    formats: ["tar.gz"]
+    format_overrides:
+      - goos: windows
+        formats: ["zip"]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files: []  # binary only, no extra files
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: zaidejjo
+    name: yvid
+  header: |
+    ## yvid {{ .Version }}
+
+    Download the binary for your platform below.
+
+    ### Installation
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/zaidejjo/yvid/main/install.sh | bash
+    ```
+
+    ### Verify checksum
+
+    ```bash
+    sha256sum -c checksums.txt --ignore-missing
+    ```
+  footer: |
+    **Full Changelog**: https://github.com/zaidejjo/yvid/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+changelog:
+  use: github-native
+
+nfpms:
+  - id: packages
+    package_name: yvid
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: "Zaid Ajo"
+    homepage: "https://github.com/zaidejjo/yvid"
+    maintainer: "Zaid Ajo <zaidejjodev@gmail.com>"
+    description: "Modern Video Downloader — fast, interactive, cross-platform"
+    license: "MIT"
+    formats:
+      - deb
+      - rpm
+      - archlinux
+    bindir: /usr/bin
+    contents:
+      - src: ./yvid-python/yvid/assets/logo.png
+        dst: /usr/share/icons/yvid/logo.png
+    recommends:
+      - ffmpeg
+    overrides:
+      archlinux:
+        recommends:
+          - ffmpeg
