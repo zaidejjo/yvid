@@ -19,47 +19,40 @@ var (
 
 // Styles
 var (
-	// App styling
+	// App styling — clean, no outer border, no background fill
 	AppStyle = lipgloss.NewStyle().
-			Padding(1, 2).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(border).
-			Background(bgDark)
+			Padding(1, 2)
 
 	TitleStyle = lipgloss.NewStyle().
 			Foreground(accent).
 			Bold(true).
 			MarginBottom(1)
 
-	// Input field
+	// Input field — width handled by textinput.Model.Width, style just adds border/padding
 	InputStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(border).
-			Padding(0, 1).
-			Width(60)
+			Padding(0, 1)
 
-	FocusedInputStyle = InputStyle.Copy().
+	FocusedInputStyle = InputStyle.
 				BorderForeground(accent)
 
-	// Search results
+	// Search results — no fixed width, adapts to terminal
 	ResultItemStyle = lipgloss.NewStyle().
-			Padding(0, 1).
-			Width(70)
+			Padding(0, 1)
 
-	ResultSelectedStyle = ResultItemStyle.Copy().
+	ResultSelectedStyle = ResultItemStyle.
 				Foreground(accent).
 				Background(bgLight).
 				Bold(true)
 
 	// Progress
 	ProgressBarStyle = lipgloss.NewStyle().
-				Width(50).
 				Padding(0, 1)
 
 	ProgressPercentStyle = lipgloss.NewStyle().
 				Foreground(accent).
 				Bold(true).
-				Width(7).
 				Align(lipgloss.Right)
 
 	// Labels
@@ -78,14 +71,17 @@ var (
 			Foreground(errColor).
 			Bold(true)
 
+	WarningStyle = lipgloss.NewStyle().
+			Foreground(warning).
+			Bold(true)
+
 	SpinnerStyle = lipgloss.NewStyle().
 			Foreground(accent)
 
 	// Status bar
 	StatusBarStyle = lipgloss.NewStyle().
 			Background(bgLight).
-			Padding(0, 1).
-			Width(70)
+			Padding(0, 1)
 
 	// Help text
 	HelpStyle = lipgloss.NewStyle().
@@ -97,4 +93,18 @@ var (
 	Separator = lipgloss.NewStyle().
 			Foreground(border).
 			Render("────────────────────────────────────────────")
+)
+
+// Card styles for list selection screens (media type, quality, dir picker)
+var (
+	cardBase = lipgloss.NewStyle().
+			Padding(0, 2)
+
+	cardSelected = cardBase.
+			Foreground(accent).
+			Background(bgLight).
+			Bold(true)
+
+	cardNormal = cardBase.
+			Foreground(text)
 )

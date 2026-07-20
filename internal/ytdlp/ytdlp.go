@@ -10,21 +10,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 // ── Types ──────────────────────────────────────────────────────
 
 // Options defines parameters for a yt-dlp download.
 type Options struct {
-	URL       string
-	Format    string // mp4 or mp3
-	Quality   string // best, 2160p, 1080p, 720p, 480p
-	Output    string // output directory
-	Subtitles bool
-	TrimStart string
-	TrimEnd   string
+	URL                string
+	Format             string // mp4 or mp3
+	Quality            string // best, 2160p, 1080p, 720p, 480p
+	Output             string // output directory
+	Subtitles          bool
+	TrimStart          string
+	TrimEnd            string
+	ArchivePath        string // path to download archive (--download-archive)
+	EnableResume       bool   // if true, yt-dlp can resume .part files
+	CookiesFromBrowser string // browser name: chrome, firefox, brave, safari
+	CookiesFile        string // path to Netscape cookies.txt file
 }
 
 // VideoMetadata holds selected fields from yt-dlp --dump-json.
@@ -82,7 +88,9 @@ type ProgressEvent struct {
 
 // Downloader manages yt-dlp subprocesses.
 type Downloader struct {
-	binary string
+	binary             string
+	cookiesFile        string
+	cookiesFromBrowser string
 }
 
 // NewDownloader creates a Downloader, finding yt-dlp in PATH.
@@ -95,6 +103,12 @@ func (d *Downloader) SetBinary(path string) {
 	d.binary = path
 }
 
+// SetCookies configures cookie-based authentication for all yt-dlp calls.
+func (d *Downloader) SetCookies(cookiesFile, cookiesFromBrowser string) {
+	d.cookiesFile = cookiesFile
+	d.cookiesFromBrowser = cookiesFromBrowser
+}
+
 // ── Metadata / Search ──────────────────────────────────────────
 
 // FetchMetadata retrieves video metadata via yt-dlp --dump-json.
@@ -104,8 +118,10 @@ func (d *Downloader) FetchMetadata(ctx context.Context, url string) (*VideoMetad
 		"--no-download",
 		"--no-playlist",
 		"--no-warnings",
-		url,
+		"--socket-timeout", "15",
 	}
+	args = d.appendCookieArgs(args)
+	args = append(args, url)
 
 	cmd := exec.CommandContext(ctx, d.binary, args...)
 	output, err := cmd.Output()
@@ -132,8 +148,10 @@ func (d *Downloader) Search(ctx context.Context, query string) ([]SearchResultIt
 		"--no-playlist",
 		"--no-warnings",
 		"--flat-playlist",
-		fmt.Sprintf("ytsearch5:%s", query),
+		"--socket-timeout", "15",
 	}
+	args = d.appendCookieArgs(args)
+	args = append(args, fmt.Sprintf("ytsearch5:%s", query))
 
 	cmd := exec.CommandContext(ctx, d.binary, args...)
 	stdout, err := cmd.StdoutPipe()
@@ -234,6 +252,10 @@ func (d *Downloader) Download(ctx context.Context, opts Options) (<-chan Progres
 
 	cmd := exec.CommandContext(ctx, d.binary, args...)
 
+	// Force Python (yt-dlp) to flush every write — critical for live progress
+	// when stdout is a pipe instead of a terminal.
+	cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("stdout pipe: %w", err)
@@ -249,28 +271,52 @@ func (d *Downloader) Download(ctx context.Context, opts Options) (<-chan Progres
 	}
 
 	ch := make(chan ProgressEvent, 64)
+	var wg sync.WaitGroup
 
+	// Goroutine 1: parse stdout progress lines
+	wg.Add(1)
 	go func() {
-		defer close(ch)
+		defer wg.Done()
 		d.parseOutput(ctx, stdout, ch)
 	}()
 
+	// Goroutine 2: read stderr for error messages
+	wg.Add(1)
 	go func() {
-		// Read stderr for debugging (yt-dlp logs errors there)
+		defer wg.Done()
 		slurp, _ := io.ReadAll(stderr)
 		if len(slurp) > 0 {
-			ch <- ProgressEvent{Status: "error", Message: strings.TrimSpace(string(slurp))}
+			evt := ProgressEvent{Status: "error", Message: strings.TrimSpace(string(slurp))}
+			select {
+			case ch <- evt:
+			case <-ctx.Done():
+			}
 		}
 	}()
 
+	// Goroutine 3: wait for yt-dlp to exit
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if err := cmd.Wait(); err != nil {
 			if exitErr, ok := err.(*exec.ExitError); ok {
-				ch <- ProgressEvent{Status: "error", Message: fmt.Sprintf("yt-dlp exited with code %d", exitErr.ExitCode())}
+				select {
+				case ch <- ProgressEvent{Status: "error", Message: fmt.Sprintf("yt-dlp exited with code %d", exitErr.ExitCode())}:
+				case <-ctx.Done():
+				}
 			} else {
-				ch <- ProgressEvent{Status: "error", Message: err.Error()}
+				select {
+				case ch <- ProgressEvent{Status: "error", Message: err.Error()}:
+				case <-ctx.Done():
+				}
 			}
 		}
+	}()
+
+	// Close channel only after ALL goroutines are done
+	go func() {
+		wg.Wait()
+		close(ch)
 	}()
 
 	return ch, nil
@@ -279,6 +325,12 @@ func (d *Downloader) Download(ctx context.Context, opts Options) (<-chan Progres
 // ── Arg building ───────────────────────────────────────────────
 
 func (d *Downloader) buildArgs(opts Options) []string {
+	// --newline forces yt-dlp to use newlines for progress (no \r carriage returns),
+	// critical when stdout is a pipe — each update becomes a separate line.
+	// --progress-template replaces the default console progress bar with a JSON
+	// line per update, prefixed with "json:" so bufio.Scanner sees one line per event.
+	// Together these ensure every progress tick arrives as an immediately parseable line.
+	// Python buffering is handled via PYTHONUNBUFFERED=1 set in Download().
 	args := []string{
 		"--no-playlist",
 		"--no-warnings",
@@ -326,6 +378,11 @@ func (d *Downloader) buildArgs(opts Options) []string {
 			"--postprocessor-args", "ffmpeg:-movflags +faststart")
 	}
 
+	// Download archive (skip already downloaded)
+	if opts.ArchivePath != "" {
+		args = append(args, "--download-archive", opts.ArchivePath)
+	}
+
 	// Subtitles
 	if opts.Subtitles {
 		args = append(args,
@@ -345,8 +402,35 @@ func (d *Downloader) buildArgs(opts Options) []string {
 		}
 	}
 
+	// Cookies — explicit file, explicit browser, or auto-detect
+	switch {
+	case opts.CookiesFile != "":
+		args = append(args, "--cookies", opts.CookiesFile)
+	case opts.CookiesFromBrowser != "":
+		args = append(args, "--cookies-from-browser", opts.CookiesFromBrowser)
+	default:
+		args = append(args, "--cookies-from-browser", defaultBrowsers[0])
+	}
+
 	args = append(args, opts.URL)
 	return args
+}
+
+// defaultBrowsers is the order of browsers to try when auto-detecting cookies.
+var defaultBrowsers = []string{"brave", "chrome", "chromium", "firefox", "edge", "safari"}
+
+// appendCookieArgs adds cookie flags to an arg list when set on the Downloader.
+// Falls back to auto-detecting common browsers when nothing is configured.
+func (d *Downloader) appendCookieArgs(args []string) []string {
+	if d.cookiesFile != "" {
+		return append(args, "--cookies", d.cookiesFile)
+	}
+	if d.cookiesFromBrowser != "" {
+		return append(args, "--cookies-from-browser", d.cookiesFromBrowser)
+	}
+	// Auto-detect: try brave (most common), then chrome, then others
+	// yt-dlp will error gracefully if browser not found
+	return append(args, "--cookies-from-browser", defaultBrowsers[0])
 }
 
 func buildTrimArgs(start, end string) string {
@@ -379,6 +463,25 @@ func (d *Downloader) parseOutput(ctx context.Context, r io.Reader, ch chan<- Pro
 			return
 		}
 	}
+
+	// If scanner stopped due to error, report it (but don't break the download).
+	// Common causes: pipe closed prematurely, context cancelled.
+	if err := scanner.Err(); err != nil && ctx.Err() == nil {
+		select {
+		case ch <- ProgressEvent{Status: "error", Message: fmt.Sprintf("progress pipe: %v", err)}:
+		case <-ctx.Done():
+		}
+	}
+}
+
+// IsBotError checks if an error is a YouTube bot-detection response.
+func IsBotError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "Sign in to confirm") ||
+		strings.Contains(msg, "confirm you're not a bot")
 }
 
 // DurationStr formats duration in seconds to "H:MM:SS".

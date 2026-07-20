@@ -23,6 +23,8 @@ Supports format selection, quality, subtitles, and trimming.`,
 			quality, _ := cmd.Flags().GetString("quality")
 			output, _ := cmd.Flags().GetString("output")
 			subs, _ := cmd.Flags().GetBool("subs")
+			cookiesFile, _ := cmd.Flags().GetString("cookies")
+			cookiesBrowser, _ := cmd.Flags().GetString("cookies-from-browser")
 
 			if url == "" && len(args) == 1 {
 				url = args[0]
@@ -32,11 +34,13 @@ Supports format selection, quality, subtitles, and trimming.`,
 			}
 
 			opts := ytdlp.Options{
-				URL:       url,
-				Format:    format,
-				Quality:   quality,
-				Output:    output,
-				Subtitles: subs,
+				URL:                url,
+				Format:             format,
+				Quality:            quality,
+				Output:             output,
+				Subtitles:          subs,
+				CookiesFile:        cookiesFile,
+				CookiesFromBrowser: cookiesBrowser,
 			}
 
 			dl := ytdlp.NewDownloader()
@@ -64,6 +68,8 @@ Supports format selection, quality, subtitles, and trimming.`,
 	cmd.Flags().StringP("quality", "q", "", "video quality (best, 2160p, 1080p, 720p, 480p)")
 	cmd.Flags().StringP("output", "o", "", "output directory")
 	cmd.Flags().BoolP("subs", "s", false, "embed subtitles when available")
+	cmd.Flags().String("cookies", "", "path to Netscape cookies.txt file")
+	cmd.Flags().String("cookies-from-browser", "", "browser to extract cookies from (chrome, firefox, brave, safari)")
 
 	return cmd
 }

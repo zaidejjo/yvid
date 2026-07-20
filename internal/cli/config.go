@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/zaidejjo/yvid/internal/config"
+	"github.com/zaidejjo/yvid/internal/download"
 )
 
 func newConfigCmd() *cobra.Command {
@@ -47,6 +48,25 @@ Subcommands:
 					return fmt.Errorf("cannot load config: %w", err)
 				}
 				fmt.Println(cfg.Render())
+
+				// Archive info
+				if cfg.DownloadArchive {
+					archivePath := cfg.ArchivePath()
+					archive, err := download.NewArchive(archivePath)
+					if err == nil {
+						fmt.Fprintf(os.Stderr, "download-archive = %s\n", archivePath)
+						fmt.Fprintf(os.Stderr, "archive-entries  = %d\n", archive.Count())
+					}
+				}
+
+				// Part file check
+				if cfg.OutputDir != "" {
+					parts, err := download.ScanPartFiles(cfg.OutputDir)
+					if err == nil && len(parts) > 0 {
+						fmt.Fprintf(os.Stderr, "\n! %s\n", download.PartFileInfo(parts))
+					}
+				}
+
 				return nil
 			},
 		},

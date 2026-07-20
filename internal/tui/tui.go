@@ -6,10 +6,20 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/zaidejjo/yvid/internal/config"
+	"github.com/zaidejjo/yvid/internal/download"
+	"github.com/zaidejjo/yvid/internal/ffmpeg"
 	"github.com/zaidejjo/yvid/internal/ytdlp"
 )
 
 // ── Message types ──────────────────────────────────────────────
+
+// depCheckResultMsg is sent after checking for yt-dlp and ffmpeg.
+type depCheckResultMsg struct {
+	ytdlpOK   bool
+	ffmpegOK  bool
+	partFiles []download.PartFile
+}
 
 // metadataMsg is sent when video metadata is fetched.
 type metadataMsg struct {
@@ -42,9 +52,10 @@ type downloadCompleteMsg struct {
 // ── Command constructors ───────────────────────────────────────
 
 // fetchMetadataCmd spawns yt-dlp --dump-json for a given URL.
-func fetchMetadataCmd(ctx context.Context, url string) tea.Cmd {
+func fetchMetadataCmd(ctx context.Context, url string, cookiesFile, cookiesFromBrowser string) tea.Cmd {
 	return func() tea.Msg {
 		dl := ytdlp.NewDownloader()
+		dl.SetCookies(cookiesFile, cookiesFromBrowser)
 		meta, err := dl.FetchMetadata(ctx, url)
 		if err != nil {
 			return errMsg{err}
@@ -54,9 +65,10 @@ func fetchMetadataCmd(ctx context.Context, url string) tea.Cmd {
 }
 
 // searchCmd spawns yt-dlp ytsearch5: for a query.
-func searchCmd(ctx context.Context, query string) tea.Cmd {
+func searchCmd(ctx context.Context, query string, cookiesFile, cookiesFromBrowser string) tea.Cmd {
 	return func() tea.Msg {
 		dl := ytdlp.NewDownloader()
+		dl.SetCookies(cookiesFile, cookiesFromBrowser)
 		results, err := dl.Search(ctx, query)
 		if err != nil {
 			return errMsg{err}
@@ -68,6 +80,17 @@ func searchCmd(ctx context.Context, query string) tea.Cmd {
 // startDownloadCmd spawns yt-dlp download and feeds progress events.
 func startDownloadCmd(ctx context.Context, opts ytdlp.Options, progressCh chan<- ytdlp.ProgressEvent) tea.Cmd {
 	return func() tea.Msg {
+		// Inject config defaults when options are empty
+		if cfg, err := config.Load(); err == nil {
+			if opts.ArchivePath == "" && cfg.DownloadArchive {
+				opts.ArchivePath = cfg.ArchivePath()
+			}
+			if opts.CookiesFile == "" && opts.CookiesFromBrowser == "" {
+				opts.CookiesFile = cfg.CookiesFile
+				opts.CookiesFromBrowser = cfg.CookiesFromBrowser
+			}
+		}
+
 		dl := ytdlp.NewDownloader()
 		ch, err := dl.Download(ctx, opts)
 		if err != nil {
@@ -106,11 +129,45 @@ func waitForProgressCmd(ch <-chan ytdlp.ProgressEvent) tea.Cmd {
 	}
 }
 
+// ── Dependency check ──────────────────────────────────────────
+
+// depCheckCmd checks if yt-dlp and ffmpeg are available and scans for .part files.
+func depCheckCmd() tea.Cmd {
+	return func() tea.Msg {
+		ytdlpOK := ytdlp.Available()
+		ffmpegOK := ffmpeg.Available()
+
+		// Scan for part files in output directory
+		var partFiles []download.PartFile
+		if cfg, err := config.Load(); err == nil && cfg.OutputDir != "" {
+			parts, _ := download.ScanPartFiles(cfg.OutputDir)
+			partFiles = parts
+		}
+
+		return depCheckResultMsg{
+			ytdlpOK:   ytdlpOK,
+			ffmpegOK:  ffmpegOK,
+			partFiles: partFiles,
+		}
+	}
+}
+
 // ── Run ────────────────────────────────────────────────────────
 
 // Run starts the interactive TUI.
-func Run(ctx context.Context, url string) error {
+func Run(ctx context.Context, url string, cookiesFile, cookiesFromBrowser string) error {
 	m := NewModel(ctx)
+
+	// CLI flags take priority, then fall back to config
+	if cookiesFile == "" && cookiesFromBrowser == "" {
+		if cfg, err := config.Load(); err == nil {
+			m.cookiesFile = cfg.CookiesFile
+			m.cookiesFromBrowser = cfg.CookiesFromBrowser
+		}
+	} else {
+		m.cookiesFile = cookiesFile
+		m.cookiesFromBrowser = cookiesFromBrowser
+	}
 
 	if url != "" {
 		m.input.SetValue(url)

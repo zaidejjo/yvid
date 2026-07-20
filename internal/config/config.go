@@ -19,11 +19,16 @@ const (
 // Config represents the persistent configuration for yvid.
 type Config struct {
 	// General
-	OutputDir  string `toml:"output-dir"`
-	Format     string `toml:"default-format"`
-	Quality    string `toml:"default-quality"`
-	Subtitles  bool   `toml:"default-subs"`
-	AutoUpdate bool   `toml:"auto-update"`
+	OutputDir          string   `toml:"output-dir"`
+	Format             string   `toml:"default-format"`
+	Quality            string   `toml:"default-quality"`
+	Subtitles          bool     `toml:"default-subs"`
+	AutoUpdate         bool     `toml:"auto-update"`
+	DownloadArchive    bool     `toml:"download-archive"`
+	ResumePrompt       bool     `toml:"resume-prompt"`
+	CookiesFile        string   `toml:"cookies-file"`
+	CookiesFromBrowser string   `toml:"cookies-from-browser"`
+	FavoriteDirs       []string `toml:"favorite-dirs"`
 
 	// paths (internal, not serialized)
 	configPath string
@@ -32,11 +37,14 @@ type Config struct {
 // Default returns a Config with sensible defaults.
 func Default() *Config {
 	return &Config{
-		OutputDir:  filepath.Join(xdg.UserDirs.Download, "YVid"),
-		Format:     "mp4",
-		Quality:    "1080p",
-		Subtitles:  false,
-		AutoUpdate: true,
+		OutputDir:       filepath.Join(xdg.UserDirs.Download, "YVid"),
+		Format:          "mp4",
+		Quality:         "1080p",
+		Subtitles:       false,
+		AutoUpdate:      true,
+		DownloadArchive: true,
+		ResumePrompt:    true,
+		FavoriteDirs:    []string{"~/Downloads", "~/Videos", "~/Music"},
 	}
 }
 
@@ -94,12 +102,23 @@ func (c *Config) Path() string {
 func (c *Config) Render() string {
 	var b strings.Builder
 	b.WriteString("# yvid configuration\n")
-	b.WriteString(fmt.Sprintf("config-file = %s\n", c.configPath))
-	b.WriteString(fmt.Sprintf("output-dir = %s\n", c.OutputDir))
-	b.WriteString(fmt.Sprintf("default-format = %s\n", c.Format))
-	b.WriteString(fmt.Sprintf("default-quality = %s\n", c.Quality))
-	b.WriteString(fmt.Sprintf("default-subs = %v\n", c.Subtitles))
-	b.WriteString(fmt.Sprintf("auto-update = %v\n", c.AutoUpdate))
+	b.WriteString(fmt.Sprintf("config-file         = %s\n", c.configPath))
+	b.WriteString(fmt.Sprintf("output-dir          = %s\n", c.OutputDir))
+	b.WriteString(fmt.Sprintf("default-format      = %s\n", c.Format))
+	b.WriteString(fmt.Sprintf("default-quality     = %s\n", c.Quality))
+	b.WriteString(fmt.Sprintf("default-subs        = %v\n", c.Subtitles))
+	b.WriteString(fmt.Sprintf("auto-update         = %v\n", c.AutoUpdate))
+	b.WriteString(fmt.Sprintf("download-archive    = %v\n", c.DownloadArchive))
+	b.WriteString(fmt.Sprintf("resume-prompt       = %v\n", c.ResumePrompt))
+	if c.CookiesFile != "" {
+		b.WriteString(fmt.Sprintf("cookies-file        = %s\n", c.CookiesFile))
+	}
+	if c.CookiesFromBrowser != "" {
+		b.WriteString(fmt.Sprintf("cookies-from-browser = %s\n", c.CookiesFromBrowser))
+	}
+	if len(c.FavoriteDirs) > 0 {
+		b.WriteString(fmt.Sprintf("favorite-dirs = %s\n", strings.Join(c.FavoriteDirs, ", ")))
+	}
 	return b.String()
 }
 
@@ -120,13 +139,36 @@ func (c *Config) Set(key, value string) error {
 		}
 		c.Quality = value
 	case "default-subs":
-		c.Subtitles = value == "true" || value == "yes" || value == "1"
+		c.Subtitles = truthy(value)
 	case "auto-update":
-		c.AutoUpdate = value == "true" || value == "yes" || value == "1"
+		c.AutoUpdate = truthy(value)
+	case "download-archive":
+		c.DownloadArchive = truthy(value)
+	case "resume-prompt":
+		c.ResumePrompt = truthy(value)
+	case "cookies-file":
+		c.CookiesFile = value
+	case "cookies-from-browser":
+		c.CookiesFromBrowser = value
+	case "favorite-dirs":
+		c.FavoriteDirs = strings.Split(value, ",")
 	default:
 		return fmt.Errorf("unknown config key: %s", key)
 	}
 	return nil
+}
+
+// ArchivePath returns the path to the download archive file.
+func (c *Config) ArchivePath() string {
+	dir, err := ConfigDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(dir, "archive.txt")
+}
+
+func truthy(value string) bool {
+	return value == "true" || value == "yes" || value == "1"
 }
 
 func configFilePath() (string, error) {

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/zaidejjo/yvid/internal/config"
 	"github.com/zaidejjo/yvid/internal/tui"
 	"github.com/zaidejjo/yvid/internal/ytdlp"
 )
@@ -65,6 +66,9 @@ Features interactive TUI, format selection, audio extraction, trimming, and more
 	root.Flags().BoolP("subs", "s", false, "embed subtitles when available")
 	root.Flags().String("trim-start", "", "trim start time (HH:MM:SS)")
 	root.Flags().String("trim-end", "", "trim end time (HH:MM:SS)")
+	root.Flags().Bool("download-archive", true, "use download archive to skip already-downloaded videos")
+	root.Flags().String("cookies", "", "path to Netscape cookies.txt file")
+	root.Flags().String("cookies-from-browser", "", "browser to extract cookies from (chrome, firefox, brave, safari)")
 
 	root.AddCommand(newConfigCmd())
 	root.AddCommand(newUpgradeCmd())
@@ -75,18 +79,43 @@ Features interactive TUI, format selection, audio extraction, trimming, and more
 
 func runTUI(cmd *cobra.Command, url string) error {
 	ctx := context.Background()
-	return tui.Run(ctx, url)
+	cookiesFile, _ := cmd.Flags().GetString("cookies")
+	cookiesBrowser, _ := cmd.Flags().GetString("cookies-from-browser")
+	return tui.Run(ctx, url, cookiesFile, cookiesBrowser)
 }
 
 func runDirect(cmd *cobra.Command, url, format, quality, output string, subs bool, trimStart, trimEnd string) error {
+	// Load config for archive path
+	useArchive, _ := cmd.Flags().GetBool("download-archive")
+	archivePath := ""
+	if useArchive {
+		if cfg, err := config.Load(); err == nil && cfg.DownloadArchive {
+			archivePath = cfg.ArchivePath()
+		}
+	}
+
+	cookiesFile, _ := cmd.Flags().GetString("cookies")
+	cookiesBrowser, _ := cmd.Flags().GetString("cookies-from-browser")
+
+	// Fall back to config cookies when CLI flags are empty
+	if cookiesFile == "" && cookiesBrowser == "" {
+		if cfg, err := config.Load(); err == nil {
+			cookiesFile = cfg.CookiesFile
+			cookiesBrowser = cfg.CookiesFromBrowser
+		}
+	}
+
 	opts := ytdlp.Options{
-		URL:       url,
-		Format:    format,
-		Quality:   quality,
-		Output:    output,
-		Subtitles: subs,
-		TrimStart: trimStart,
-		TrimEnd:   trimEnd,
+		URL:                url,
+		Format:             format,
+		Quality:            quality,
+		Output:             output,
+		Subtitles:          subs,
+		TrimStart:          trimStart,
+		TrimEnd:            trimEnd,
+		ArchivePath:        archivePath,
+		CookiesFile:        cookiesFile,
+		CookiesFromBrowser: cookiesBrowser,
 	}
 
 	dl := ytdlp.NewDownloader()
